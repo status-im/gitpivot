@@ -1,8 +1,6 @@
-pragma solidity ^0.4.8;
-
 /**
+ * GitHubOracle.sol
  * Contract that oracle github API
- * 
  * GitHubOracle register users and create GitHubToken contracts
  * Registration requires user create a gist with only their account address
  * GitHubOracle will create one GitHubToken contract per repository
@@ -17,37 +15,49 @@ pragma solidity ^0.4.8;
  
 import "lib/oraclize/oraclizeAPI_0.4.sol";
 import "lib/ethereans/management/Owned.sol";
-import "./DGitDB.sol";
-import "./GitHubAPI.sol";
-import "./GitRepository.sol";
+import "GitHubUserReg.sol";
+import "GitHubRepositoryReg.sol";
+import "GitHubPoints.sol";
 
-contract DGit is Owned, DGitI {
+pragma solidity ^0.4.11;
 
-    DGitDBI public db;
-    GitHubAPI public gitHubApi;
+contract GitHubOracle is Owned, DGitI {
 
+    GitHubUserReg public userReg;
+    GitHubRepositoryReg public repositoryReg;
+    GitHubPoints public gitHubPoints;
+
+    mapping (uint256 => Repository) repositories;
+    mapping (uint256 => mapping (uint256 => uint256)) pendingPoints;
+
+    struct Repository {
+        bytes20 head;
+        bytes20 tail;
+    }
+    
     function initialize() only_owner {
-        db = DBFactory.newStorage();
-        gitHubApi = QueryFactory.newGitHubAPI();
+        userReg = QueryFactory.newUserReg();
+        repositoryReg = QueryFactory.newRepositoryReg();
+        gitHubPoints = QueryFactory.newPointsOracle();
     }
 
     function register(string _github_user, string _gistid) payable{
-        gitHubApi.register.value(msg.value)(msg.sender,_github_user,_gistid);
+        userReg.register.value(msg.value)(msg.sender,_github_user,_gistid);
     }
     function updateCommits(string _repository) payable{
-        gitHubApi.updateCommits.value(msg.value)(_repository,db.getClaimedHead(_repository));
+        gitHubPoints.updateCommits.value(msg.value)(_repository,db.getClaimedHead(_repository));
     }
     function addRepository(string _repository) payable{
-        gitHubApi.addRepository.value(msg.value)(_repository);
+        repositoryReg.addRepository.value(msg.value)(_repository);
     }
     function updateIssue(string _repository, string issue) payable{
-        gitHubApi.updateIssue.value(msg.value)(_repository,issue);
+        gitHubPoints.updateIssue.value(msg.value)(_repository,issue);
     }
     function getRepository(uint projectId) constant returns (address){
-        return db.getRepositoryAddress(projectId);
+        return repositoryReg.getAddr(projectId);
     } 
     function getRepository(string full_name) constant returns (address){
-        return db.getRepositoryAddress(full_name);
+        return repositoryReg.getAddr(full_name);
     } 
 
     modifier only_gitapi{
@@ -55,42 +65,29 @@ contract DGit is Owned, DGitI {
         _;
     }
     
-    event UserSet(string githubLogin);
-    function __register(address addrLoaded, uint256 userId, string login) 
-     only_gitapi {
-        UserSet(login); 
-        db.addUser(userId, login, 0, addrLoaded);
-    }
-    
-    event GitRepositoryRegistered(uint256 projectId, string full_name, uint256 watchers, uint256 subscribers);    
-    function __setRepository(uint256 projectId, string full_name, uint256 watchers, uint256 subscribers) only_gitapi //[83725290, "ethereans/github-token", 4, 2]
-    {
-        uint256 ownerId; string memory name; //TODO
-        address repository = db.getRepositoryAddress(projectId);
-        if(repository == 0x0){            
-            GitRepositoryRegistered(projectId,full_name,watchers,subscribers);
-            repository = GitFactory.newGitRepository(projectId,full_name);
-            db.addRepository(projectId,ownerId,name,full_name,repository);
-        }
-        GitRepositoryI(repository).setStats(subscribers,watchers);
-    }
+    event NewPoints(uint repoId, uint userId, uint total, bool claimed);
 
-    event NewPoints(string repository, uint userId, uint total);
-    function __newPoints(string repository, uint userId, uint total)
+    function __newPoints(uint repoId, uint userId, uint total)
      only_gitapi {
-		NewPoints(repository,userId,total); 
-		GitRepositoryI repoaddr = GitRepositoryI(db.getRepositoryAddress(repository));
-		if(!repoaddr.claim(db.getUserAddress(userId), total)){ //try to claim points
-		    db.setPending(repository, userId, total); //set as a pending points
+		GitRepositoryI repoaddr = GitRepositoryI(repositoryReg.getAddr(repoId));
+        bool claimed = repoaddr.claim(db.getUserAddress(userId), total);
+		if(!claimed){ //try to claim points
+		    addPending(repoId, userId, total); //set as a pending points
 		}
+        NewPoints(repository,userId,total,claimed); 
     }
     
     //claims pending points
     function claimPending(uint repoId, uint userId){
-        GitRepositoryI repoaddr = GitRepositoryI(db.getRepositoryAddress(repoId));
-        uint total = db.claimPending(repoId,userId);
-        if(!repoaddr.claim(db.getUserAddress(userId), total)) throw;
-        
+        GitRepositoryI repoaddr = GitRepositoryI(repositoryReg.getAddr(repoId));
+        uint total = pending[_userId][_repoId];
+        delete pending[_userId][_repoId];
+        if(repoaddr.claim(gitHubUserRegistry.getAddr(userId), total)) {
+            NewPoints(repository,userId,total,true);
+        } else throw;
     }
 
+    function addPending(uint256 _repoid, uint256 _userid, uint256 _points) internal {
+        pending[_userId][_repoId] += _points;
+    }
 }

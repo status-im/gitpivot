@@ -1,8 +1,12 @@
-//Author: Ricardo Guilherme Schmidt <3esmit@gmail.com>
-pragma solidity ^0.4.11;
-
+/** 
+ * GitHubUserReg.sol 
+ * Registers GitHub user login to an address
+ * Ricardo Guilherme Schmidt <3esmit@gmail.com>
+ */
 import "GitHubAPIReg.sol";
 import "NameRegistry.sol";
+
+pragma solidity ^0.4.11;
 
 contract GitHubUserReg is NameRegistry, GitHubAPIReg {
 

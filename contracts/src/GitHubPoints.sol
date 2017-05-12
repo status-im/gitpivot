@@ -5,14 +5,7 @@ import "lib/StringLib.sol";
 import "lib/JSONLib.sol";
 import "lib/ethereans/management/Owned.sol";
 
-
-contract GitHubAPI{
-     function updateCommits(string _full_name, string _branch, bytes20 _commitid) payable;
-     function updateIssue(string _full_name, string _issue) payable;
-}
-
 contract DGitI {
-    function __addRepository(uint256 projectId, string full_name, string default_branch);
     function __setHead(uint256 projectId, string branch, bytes20 head);
     function __setTail(uint256 projectId, string branch, bytes20 tail);
     function __newPoints(uint256 projectId, uint256 userId, uint total);
@@ -20,7 +13,7 @@ contract DGitI {
     function __setIssuePoints(uint256 projectId, uint256 issueId, uint256 userId, uint256 points);
 }
 
-contract GitHubOracle is GitHubAPI, Owned, usingOraclize{
+contract GitHubPoints is Owned, usingOraclize{
     using StringLib for string;
     DGitI dGit
     
@@ -37,7 +30,7 @@ contract GitHubOracle is GitHubAPI, Owned, usingOraclize{
         bytes20 commitid;
     }
     
-    function GitHubOracle(string _script){
+    function GitHubPoints(string _script){
         script = _script;
         dGit = DGitI(msg.sender);
         oraclize_setProof(proofType_TLSNotary | proofStorage_IPFS);
@@ -76,19 +69,6 @@ contract GitHubOracle is GitHubAPI, Owned, usingOraclize{
         delete claimType[myid];  //should always be deleted
     }
 
-    function _addRepository(bytes32 myid, string result) internal {//[85743750, "ethereans/TheEtherian", "master"]
-        bytes memory v = bytes(result);
-        uint8 pos = 0;
-        string memory temp;
-        uint256 projectId; 
-        (projectId,pos) = JSONLib.getNextUInt(v,pos);
-        string memory full_name;
-        (full_name,pos) = JSONLib.getNextString(v,pos);
-        string memory default_branch;
-        (default_branch,pos) = JSONLib.getNextString(v,pos);
-        dGit.__addRepository(projectId,full_name,default_branch);
-     }
-    
     function _updateCommits(bytes32 myid, string result, bool continuing) internal {
         bytes memory v = bytes(result);
         uint8 pos = 0;

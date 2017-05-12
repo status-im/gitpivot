@@ -1,28 +1,29 @@
-//Author: Ricardo Guilherme Schmidt <3esmit@gmail.com>
-pragma solidity ^0.4.11;
+/** 
+ * GitHubRepositoryReg.sol
+ * Registers the master branch of a Repository for GitHubOracle tracking.
+ * Ricardo Guilherme Schmidt <3esmit@gmail.com>
+ */
 
 import "GitHubAPIReg.sol";
 import "NameRegistry.sol";
 import "GitRepository.sol";
 
+pragma solidity ^0.4.11;
+
 contract GitHubRepositoryReg is NameRegistry, GitHubAPIReg {
 
     mapping (uint256 => Repository) repositories; 
 
-    event UpdatedRepository(address addr, uint256 projectId, string full_name, string default_branch);
+    event NewRepository(address addr, uint256 projectId, string full_name, string default_branch);
     
     struct Repository {
         address addr; 
-        string full_name;
+        string name;
         string branch; 
     }
 
-    function GitHubRepositoryReg(){
-        oraclize_setProof(proofType_TLSNotary | proofStorage_IPFS);
-    }
-    
-    function setRepository(string _repository, bool create) payable only_owner{
-       oraclize_query("URL", getQuery(_repository), create? 4000000 : 1000000);
+    function register(string _repository) payable {
+       oraclize_query("URL", _getQuery(_repository), getAddr(_repository) == 0x00? 4000000 : 1000000);
     }
 
     function getAddr(uint256 _id) public constant returns(address addr) {
@@ -30,7 +31,7 @@ contract GitHubRepositoryReg is NameRegistry, GitHubAPIReg {
     }
 
      function getName(address _addr) public constant returns(string name){
-        return repositories[indexes[sha3(_addr)]].login;
+        return repositories[indexes[sha3(_addr)]].name;
     } 
 
     function getAddr(string _name) public constant returns(address addr) {
@@ -51,7 +52,6 @@ contract GitHubRepositoryReg is NameRegistry, GitHubAPIReg {
     {
         bytes memory v = bytes(result);
         uint8 pos = 0;
-        string memory temp;
         uint256 projectId; 
         (projectId,pos) = getNextUInt(v,pos);
         string memory full_name;
@@ -60,14 +60,14 @@ contract GitHubRepositoryReg is NameRegistry, GitHubAPIReg {
         (default_branch,pos) = getNextString(v,pos);
         address repoAddr = repositories[projectId].addr;
         if(repoAddr == 0x0){   
-            repoAddr = address(GitFactory.newGitRepository(projectId, full_name, default_branch));
+            //repoAddr = address(GitFactory.newGitRepository(projectId, full_name, default_branch));
             indexes[sha3(repoAddr)] = projectId; 
             indexes[sha3(full_name)] = projectId;
-            NewRepository(repoAddr, projectId, full_name, default_branch);            
-            repositories[projectId] = Repository(addr: repoAddr, full_name: full_name, default_branch: default_branch);|
+            NewRepository(repoAddr, projectId, full_name, default_branch);
+            repositories[projectId] = Repository({addr: repoAddr, name: full_name, branch: default_branch});
         }else{
             bytes32 _new = sha3(full_name);
-            bytes32 _old = sha3(repositories[projectId].full_name);
+            bytes32 _old = sha3(repositories[projectId].name);
             if(_new != _old){
                 _updateIndex(_old, _new);
             }

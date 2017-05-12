@@ -23,7 +23,6 @@ import "./GitRepositoryToken.sol";
 
 contract GitRepositoryI {
     function claim(address _user, uint _total) returns (bool) ; 
-    function setStats(uint256 _subscribers, uint256 _watchers);
 }
 
 contract GitRepository is GitRepositoryI, Owned {
@@ -35,9 +34,6 @@ contract GitRepository is GitRepositoryI, Owned {
 
     string public name;
     uint256 public uid;
-
-    uint256 public subscribers;
-    uint256 public watchers;
 
     function () payable {
         donationBank.deposit();
@@ -63,12 +59,6 @@ contract GitRepository is GitRepositoryI, Owned {
         }else{
             return false;
         }
-    }
-    
-    function setStats(uint256 _subscribers, uint256 _watchers)
-     only_owner {
-        subscribers = _subscribers;
-        watchers = _watchers;
     }
     
     function bountyState(uint issue, bool open) only_owner {

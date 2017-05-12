@@ -1,14 +1,19 @@
-//Author: Ricardo Guilherme Schmidt <3esmit@gmail.com>
-pragma solidity ^0.4.11;
-
+/** 
+ * GitHubAPIReg.sol 
+ * Abstract Logic for GitHubOracle Registries.
+ * Ricardo Guilherme Schmidt <3esmit@gmail.com>
+ */
 import "lib/ethereans/management/Owned.sol";
+import "lib/oraclize/oraclizeAPI_0.4.sol";
+
+pragma solidity ^0.4.11;
 
 contract GitHubAPIReg is Owned, usingOraclize {
     string credentials = "";
 
     event OracleEvent(bytes32 myid, string result, bytes proof);
     
-    function GitHubAPI(){
+    function GitHubAPIReg(){
         oraclize_setProof(proofType_TLSNotary | proofStorage_IPFS);
     }
 
@@ -21,7 +26,7 @@ contract GitHubAPIReg is Owned, usingOraclize {
          credentials = "";
     }
 
-    function getNextString(bytes _str, uint8 _pos) internal constant returns (string,uint8) {
+    function getNextString(bytes _str, uint8 _pos) internal constant returns (string, uint8) {
         uint8 start = 0;
         uint8 end = 0;
         uint strl =_str.length;
@@ -43,7 +48,7 @@ contract GitHubAPIReg is Owned, usingOraclize {
         return (string(str),_pos);
 	}
 
-    function getNextUInt(bytes _str, uint8 _pos) internal constant returns (uint,uint8) {
+    function getNextUInt(bytes _str, uint8 _pos) internal constant returns (uint, uint8) {
         uint val = 0;
         uint strl =_str.length;
         for (; strl > _pos; _pos++) {
