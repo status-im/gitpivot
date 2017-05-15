@@ -1,9 +1,7 @@
-pragma solidity ^0.4.9;
-
 import "lib/oraclize/oraclizeAPI_0.4.sol";
-import "lib/StringLib.sol";
-import "lib/JSONLib.sol";
 import "lib/ethereans/management/Owned.sol";
+
+pragma solidity ^0.4.11;
 
 contract DGitI {
     function __setHead(uint256 projectId, string branch, bytes20 head);
@@ -14,15 +12,14 @@ contract DGitI {
 }
 
 contract GitHubPoints is Owned, usingOraclize{
-    using StringLib for string;
-    DGitI dGit
-    
+
     string private cred = ""; 
     string private script = "";
     
     enum OracleType { CLAIM_COMMIT, CLAIM_CONTINUE, UPDATE_ISSUE }
     mapping (bytes32 => OracleType) claimType; //temporary db enumerating oraclize calls
-    mapping (bytes32 => CommitClaim) commitClaim; //temporary db for oraclize commit token claim calls
+    mapping (bytes32 => bytes20) commitClaim; //temporary db for oraclize commit token claim calls
+    mapping (bytes32 => Request) request; //temporary db
     
     //stores temporary data for oraclize repository commit claim
     struct CommitClaim {
@@ -30,27 +27,46 @@ contract GitHubPoints is Owned, usingOraclize{
         bytes20 commitid;
     }
     
-    function GitHubPoints(string _script){
-        script = _script;
-        dGit = DGitI(msg.sender);
-        oraclize_setProof(proofType_TLSNotary | proofStorage_IPFS);
+    struct Request {
+        address caller;
+        OracleType ot;
     }
     
-    function updateCommits(string _repository, string _branch, bytes20 _commitid)
-     payable only_owner{
-        bytes32 ocid = oraclize_query("computation", [script, "update-new",_repository.concat(",", _branch,",",toString(_commitid)),cred]);
+    function start(string _repository, string _branch, string _cred) payable only_owner {
+        if(bytes(_cred).length == 0) _cred = cred; 
+        bytes32 ocid = oraclize_query("computation", [script, "update-new", strConcat(_repository, ",", _branch), _cred]);
         claimType[ocid] = OracleType.CLAIM_COMMIT;
-        commitClaim[ocid] = CommitClaim( { repository: _repository, commitid:_commitid});
+        request[ocid].caller = msg.sender;
+        request[ocid].ot = OracleType.CLAIM_COMMIT;
     }
     
-    function continueUpdateCommits(string _repository, string _branch, bytes20 _lastCommit,bytes20 _limitCommit)
+    function update(string _repository, string _branch, bytes20 _commitid, string _cred) payable only_owner {
+        if(bytes(_cred).length == 0) _cred = cred; 
+        bytes32 ocid = oraclize_query("computation", [script, "update-new", strConcat(_repository, ",", _branch, ",", toString(_commitid)), _cred]);
+        claimType[ocid] = OracleType.CLAIM_COMMIT;
+        commitClaim[ocid] = _commitid;
+        request[ocid].caller = msg.sender;
+        request[ocid].ot = OracleType.CLAIM_COMMIT;
+    }
+    
+    function resume(string _repository, string _branch, bytes20 _lastCommit, bytes20 _limitCommit, string _cred)
      payable only_owner{
-        bytes32 ocid = oraclize_query("computation", [script, "update-old",_repository.concat(",", _branch,",",toString(_lastCommit)).concat(",",toString(_limitCommit)),cred]);
+        if(bytes(_cred).length == 0) _cred = cred; 
+        string memory query = strConcat(_repository,",", _branch,",",toString(_lastCommit));
+        query = strConcat(",",toString(_limitCommit));
+        bytes32 ocid = oraclize_query("computation", [script, "update-old",query,_cred]);
         claimType[ocid] = OracleType.CLAIM_CONTINUE;
+        commitClaim[ocid] = _lastCommit;
+        request[ocid].caller = msg.sender;
+        request[ocid].ot = OracleType.CLAIM_CONTINUE;
     }
     
-    function updateIssue(string _repository, string issue) payable only_owner{
-         bytes32 ocid = oraclize_query("computation", [script, "issue-update",_repository.concat(",",issue),cred]);
+    function issue(string _repository, string issue, string _cred)
+     payable only_owner{
+        if(bytes(_cred).length == 0) _cred = cred; 
+        bytes32 ocid = oraclize_query("computation", [script, "issue-update",strConcat(_repository,",",issue),_cred]);
+        request[ocid].caller = msg.sender;
+        request[ocid].ot = OracleType.UPDATE_ISSUE;
     }
     
     event OracleEvent(bytes32 myid, string result, bytes proof);
@@ -59,78 +75,82 @@ contract GitHubPoints is Owned, usingOraclize{
         OracleEvent(myid, result, proof);
         if (msg.sender != oraclize.cbAddress()){
           throw;  
-        }else if(claimType[myid]==OracleType.CLAIM_COMMIT){ 
-            _updateCommits(myid, result, false);
-        }else if(claimType[myid]==OracleType.CLAIM_CONTINUE){ 
-            _updateCommits(myid, result, true);
         }else if(claimType[myid] == OracleType.UPDATE_ISSUE){
             _updateIssue(myid, result);
+        }else{
+             _updateCommits(commitClaim[myid], result,claimType[myid]==OracleType.CLAIM_CONTINUE);
         }
         delete claimType[myid];  //should always be deleted
     }
 
-    function _updateCommits(bytes32 myid, string result, bool continuing) internal {
+    function _updateCommits(bytes20 oldCommit, string result, bool resume) internal {
+        DGitI dGit = DGitI(owner);
         bytes memory v = bytes(result);
         uint8 pos = 0;
         string memory temp;
         uint256 projectId; 
-        (projectId,pos) = JSONLib.getNextUInt(v,pos);
+        (projectId,pos) = getNextUInt(v,pos);
         string memory branch;
-        (branch,pos) = JSONLib.getNextString(v,pos);
-        (temp,pos) = JSONLib.getNextString(v,pos);
-        bytes20 head = temp.toBytes20();
-        (temp,pos) = JSONLib.getNextString(v,pos);
-        bytes20 tail = temp.toBytes20();
-        uint numAuthors;
-        (numAuthors,pos) = JSONLib.getNextUInt(v,pos);
-        uint userId;
-        uint points;
+        (branch,pos) = getNextString(v,pos);
+        (temp,pos) = getNextString(v,pos);
+        bytes20 head = toBytes20(temp);
+        (temp,pos) = getNextString(v,pos);
+        bytes20 tail = toBytes20(temp);
         dGit.__setHead(projectId,branch,head);
-        if(continuing){
+        if(resume){
             dGit.__setTail(projectId,branch,tail);    
         }else{
-            bytes20 oldCommit = commitUpdate[myid].commitid;
             if(oldCommit == 0x0){
                 dGit.__setTail(projectId,branch,tail);    
             }else if (oldCommit != tail){
                 //TODO: acceptContinueUpdateUntilLimit(tail,oldCommit)
             }
         }
+        uint numAuthors;
+        (numAuthors,pos) = getNextUInt(v,pos);
+        uint userId;
+        uint points;
         for(uint i; i < numAuthors; i++){
-            (userId,pos) = JSONLib.getNextUInt(v,pos);
-            (points,pos) = JSONLib.getNextUInt(v,pos);
+            (userId,pos) = getNextUInt(v,pos);
+            (points,pos) = getNextUInt(v,pos);
             dGit.__newPoints(projectId,userId,points);
         }
     }
     
     function _updateIssue(bytes32 myid, string result) internal {
+        DGitI dGit = DGitI(request[myid].caller);
         bytes memory v = bytes(result);
         uint8 pos = 0;
         string memory temp;
         uint256 projectId; 
-        (projectId,pos) = JSONLib.getNextUInt(v,pos);
+        (projectId,pos) = getNextUInt(v,pos);
         uint256 issueId; 
-        (issueId,pos) = JSONLib.getNextUInt(v,pos);
+        (issueId,pos) = getNextUInt(v,pos);
         bool state;
-        (temp,pos) = JSONLib.getNextString(v,pos);
-        state = (temp.compare("open") == 0);
+        (temp,pos) = getNextString(v,pos);
+        state = (sha3("open") == sha3(temp));
         uint256 closedAt; 
-        (closedAt,pos) = JSONLib.getNextUInt(v,pos);
+        (closedAt,pos) = getNextUInt(v,pos);
         uint numAuthors;
-        (numAuthors,pos) = JSONLib.getNextUInt(v,pos);
+        (numAuthors,pos) = getNextUInt(v,pos);
         uint userId;
         uint points;
         dGit.__setIssue(projectId,issueId,state,closedAt);
         for(uint i; i < numAuthors; i++){
-            (userId,pos) = JSONLib.getNextUInt(v,pos);
-            (points,pos) = JSONLib.getNextUInt(v,pos);
+            (userId,pos) = getNextUInt(v,pos);
+            (points,pos) = getNextUInt(v,pos);
             dGit.__setIssuePoints(projectId,issueId,userId,points);
         }
     }
     
     //owner management
-    function setAPICredentials(string _client_id, string _client_secret) only_owner {
-         cred = StringLib.concat(_client_id,",", _client_secret);
+    function GitHubPoints(string _script){
+        script = _script;
+        oraclize_setProof(proofType_TLSNotary | proofStorage_IPFS);
+    }
+    
+    function setAPICredentials(string _client_id_comma_client_secret) only_owner {
+         cred = _client_id_comma_client_secret;
     }
     
     function setScript(string _script) only_owner{
@@ -140,7 +160,12 @@ contract GitHubPoints is Owned, usingOraclize{
     function clearAPICredentials() only_owner {
          cred = "";
      }
-
+     
+    function toBytes20(string memory source) internal constant returns (bytes20 result) {
+        assembly {
+            result := mload(add(source, 20))
+        }
+    }
     function toString(bytes20 self) internal constant returns (string) {
         bytes memory bytesString = new bytes(20);
         uint charCount = 0;
@@ -157,13 +182,49 @@ contract GitHubPoints is Owned, usingOraclize{
         }
         return string(bytesStringTrimmed);
     }
+    
+    function getNextString(bytes _str, uint8 _pos) internal constant returns (string, uint8) {
+        uint8 start = 0;
+        uint8 end = 0;
+        uint strl =_str.length;
+        for (;strl > _pos; _pos++) {
+            if (_str[_pos] == '"'){ //Found quotation mark
+                if(_str[_pos-1] != '\\'){ //is not escaped
+	                end = start == 0 ? 0: _pos;
+	                start = start == 0 ? (_pos+1) : start;
+	                if(end > 0) break; 
+                }
+            }
+        }
+    	bytes memory str = new bytes(end-start);
+        for(_pos=0; _pos<str.length; _pos++){
+            str[_pos] = _str[start+_pos];
+        }
+        for(_pos=end+1; _pos<_str.length; _pos++) if (_str[_pos] == ','){ _pos++; break; } //end
 
+        return (string(str),_pos);
+	}
+
+    function getNextUInt(bytes _str, uint8 _pos) internal constant returns (uint, uint8) {
+        uint val = 0;
+        uint strl =_str.length;
+        for (; strl > _pos; _pos++) {
+            byte bp = _str[_pos];
+            if (bp == ','){ //Find ends
+                _pos++; break;
+            }else if ((bp >= 48)&&(bp <= 57)){ //only ASCII numbers
+                val *= 10;
+                val += uint(bp) - 48;
+            }
+        }
+        return (val,_pos);
+    }
 }
 
-library QueryFactory {
+library GitHubPointsFactory {
 
-    function newGitHubAPI() returns (GitHubAPI){
-        return new GitHubOracle();
+    function create() returns (GitHubPoints){
+        return new GitHubPoints("");
     }
 
 }
