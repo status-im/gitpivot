@@ -4,9 +4,9 @@
  * Ricardo Guilherme Schmidt <3esmit@gmail.com>
  */
 
-import "GitHubAPIReg.sol";
-import "NameRegistry.sol";
-import "GitRepository.sol";
+import "./GitHubAPIReg.sol";
+import "./NameRegistry.sol";
+import "./GitRepository.sol";
 
 pragma solidity ^0.4.11;
 
@@ -36,6 +36,10 @@ contract GitHubRepositoryReg is NameRegistry, GitHubAPIReg {
 
     function getAddr(string _name) public constant returns(address addr) {
         return repositories[indexes[sha3(_name)]].addr;
+    }
+    
+    function getBranch(uint256 _id) public constant returns(string branch) {
+        return repositories[_id].branch;
     }
 
     //oraclize response callback
@@ -76,6 +80,13 @@ contract GitHubRepositoryReg is NameRegistry, GitHubAPIReg {
     //internal helper functions
     function _getQuery(string _repository) internal constant returns (string){
         return strConcat("json(https://api.github.com/repos/",_repository,credentials,").$.id,full_name,default_branch");
+    }
+
+}
+library GitHubRepositoryRegFactory {
+
+    function create() returns (GitHubRepositoryReg){
+        return new GitHubRepositoryReg();
     }
 
 }
