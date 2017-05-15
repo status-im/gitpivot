@@ -12,7 +12,7 @@ pragma solidity ^0.4.11;
 
 contract GitHubRepositoryReg is NameRegistry, GitHubAPIReg {
 
-    mapping (uint256 => Repository) repositories; 
+    mapping (uint256 => Repository) public repositories; 
 
     event NewRepository(address addr, uint256 projectId, string full_name, string default_branch);
     
