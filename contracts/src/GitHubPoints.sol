@@ -1,5 +1,6 @@
 import "lib/oraclize/oraclizeAPI_0.4.sol";
 import "lib/ethereans/management/Owned.sol";
+import "lib/strings.sol";
 
 pragma solidity ^0.4.11;
 
@@ -31,32 +32,34 @@ contract GitHubPoints is Owned, usingOraclize{
         address caller;
         OracleType ot;
     }
-    
+
+    function _query_start(string _repository, string _branch, string _cred) internal {
+        strConcat("[computation] ['", script, "', 'update-new', '", _repository, strConcat("','", _branch,"', '", _cred,"']"))
+    }
+
     function start(string _repository, string _branch, string _cred) payable only_owner {
         if(bytes(_cred).length == 0) _cred = cred; 
-        bytes32 ocid = oraclize_query("computation", [script, "update-new", strConcat(_repository, ",", _branch), _cred]);
+        bytes32 ocid = oraclize_query("nested", _query_start(_repository,_branch,_cred));
         claimType[ocid] = OracleType.CLAIM_COMMIT;
         request[ocid].caller = msg.sender;
         request[ocid].ot = OracleType.CLAIM_COMMIT;
     }
     
-    function update(string _repository, string _branch, bytes20 _commitid, string _cred) payable only_owner {
+    function update(string _repository, string _branch, string _commitid, string _cred) payable only_owner {
         if(bytes(_cred).length == 0) _cred = cred; 
-        bytes32 ocid = oraclize_query("computation", [script, "update-new", strConcat(_repository, ",", _branch, ",", toString(_commitid)), _cred]);
+        bytes32 ocid = oraclize_query("nested", _query_update(_repository,_branch,_commitid,_cred));
         claimType[ocid] = OracleType.CLAIM_COMMIT;
-        commitClaim[ocid] = _commitid;
+        commitClaim[ocid] = toBytes20(_commitid);
         request[ocid].caller = msg.sender;
         request[ocid].ot = OracleType.CLAIM_COMMIT;
     }
     
-    function resume(string _repository, string _branch, bytes20 _lastCommit, bytes20 _limitCommit, string _cred)
+    function resume(string _repository, string _branch, string _lastCommit, string _limitCommit, string _cred)
      payable only_owner{
         if(bytes(_cred).length == 0) _cred = cred; 
-        string memory query = strConcat(_repository,",", _branch,",",toString(_lastCommit));
-        query = strConcat(",",toString(_limitCommit));
-        bytes32 ocid = oraclize_query("computation", [script, "update-old",query,_cred]);
+        bytes32 ocid = oraclize_query("nested", _query_resume(_repository,_branch,_lastCommit,_limitCommit,_cred));
         claimType[ocid] = OracleType.CLAIM_CONTINUE;
-        commitClaim[ocid] = _lastCommit;
+        commitClaim[ocid] = toBytes20(_lastCommit);
         request[ocid].caller = msg.sender;
         request[ocid].ot = OracleType.CLAIM_CONTINUE;
     }
@@ -64,7 +67,7 @@ contract GitHubPoints is Owned, usingOraclize{
     function issue(string _repository, string issue, string _cred)
      payable only_owner{
         if(bytes(_cred).length == 0) _cred = cred; 
-        bytes32 ocid = oraclize_query("computation", [script, "issue-update",strConcat(_repository,",",issue),_cred]);
+        bytes32 ocid = oraclize_query("nested", _query_issue(_repository,_issue,_cred));
         request[ocid].caller = msg.sender;
         request[ocid].ot = OracleType.UPDATE_ISSUE;
     }
@@ -160,12 +163,83 @@ contract GitHubPoints is Owned, usingOraclize{
     function clearAPICredentials() only_owner {
          cred = "";
      }
-     
+
+    function _query_script(string command, string args, string cred) internal returns (string)  {
+       strings.slice memory comma = strings.toSlice("', '"); 
+       strings.slice [] memory cm = new strings.slice[](4);
+       cm[0] = script.toSlice();
+       cm[1] = command.toSlice();
+       cm[2] = args.toSlice();
+       cm[3] = cred.toSlice();
+       string memory array = comma.join(cm);
+       cm = new strings.slice[](3);
+       cm[0] = strings.toSlice("[computation] ['");
+       cm[1] = array.toSlice();
+       cm[2] = strings.toSlice("']");
+       return strings.toSlice("").join(cm);        
+    }
+    
+    function _query_start(string _repository, string _branch, string _cred)  internal returns (string)  {
+       strings.slice memory comma = strings.toSlice(",");
+       strings.slice [] memory cm = new strings.slice[](2);
+       cm[0] = _repository.toSlice();
+       cm[1] = _branch.toSlice();
+       return _query_script("update",comma.join(cm),_cred);
+    }
+
+    function _query_update(string _repository, string _branch, string _lastCommit, string _cred)  internal returns (string)  {
+       strings.slice memory comma = strings.toSlice(",");
+       strings.slice [] memory cm = new strings.slice[](3);
+       cm[0] = _repository.toSlice();
+       cm[1] = _branch.toSlice();
+       cm[2] = _lastCommit.toSlice();
+       return _query_script("update",comma.join(cm),_cred);
+    }
+    
+    function _query_resume(string _repository, string _branch, string _lastCommit, string _limitCommit, string _cred) internal constant returns (string){
+       strings.slice memory comma = strings.toSlice(",");
+       strings.slice [] memory cm = new strings.slice[](4);
+       cm[0] = _repository.toSlice();
+       cm[1] = _branch.toSlice();
+       cm[2] = _lastCommit.toSlice();
+       cm[3] = _limitCommit.toSlice();
+       return _query_script("resume",comma.join(cm),_cred);
+    }
+    
+    function _query_issue(string _repository, string _issue, string _cred) internal returns(string){
+       strings.slice memory comma = strings.toSlice(",");
+       strings.slice [] memory cm = new strings.slice[](2);
+       cm[0] = _repository.toSlice();
+       cm[1] = _issue.toSlice();
+       return _query_script("resume",comma.join(cm),_cred);
+    }
+    
+    //"ethereans/TheEtherian","master","client,secret"
+    function query_start(string _repository, string _branch, string _cred)  constant returns (string)  {
+        return _query_start(_repository,_branch,_cred);
+    }
+    
+    //"ethereans/TheEtherian","master","3258ebfded07a6e35d400994db507e456e194716","client,secret"
+    function query_update(string _repository, string _branch, string _lastCommit, string _cred)  constant returns (string)  {
+        return _query_update(_repository,_branch,_lastCommit,_cred);
+    }
+    
+    //"ethereans/TheEtherian","master","3258ebfded07a6e35d400994db507e456e194716","3acd26bf0f1f68ac2d7d26bfceb624bb0f01593a","client,secret"
+    function query_resume(string _repository, string _branch, string _lastCommit, string _limitCommit, string _cred)  constant returns (string)  {
+        return _query_resume(_repository,_branch,_lastCommit,_limitCommit,_cred);
+    }
+    
+    //"ethereans/TheEtherian","1","client,secret"
+    function query_issue(string _repository, string _issue, string _cred)  constant returns (string)  {
+        return _query_issue(_repository,_issue,_cred);
+    }
+
     function toBytes20(string memory source) internal constant returns (bytes20 result) {
         assembly {
             result := mload(add(source, 20))
         }
     }
+
     function toString(bytes20 self) internal constant returns (string) {
         bytes memory bytesString = new bytes(20);
         uint charCount = 0;
@@ -182,7 +256,7 @@ contract GitHubPoints is Owned, usingOraclize{
         }
         return string(bytesStringTrimmed);
     }
-    
+
     function getNextString(bytes _str, uint8 _pos) internal constant returns (string, uint8) {
         uint8 start = 0;
         uint8 end = 0;
