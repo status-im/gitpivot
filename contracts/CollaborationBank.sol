@@ -1,5 +1,3 @@
-pragma solidity ^0.4.0;
-
 /**
  * Abstract contract used for recieving donations or profits
  * Withdraw is divided by total tokens each account owns
@@ -13,8 +11,10 @@ pragma solidity ^0.4.0;
  */
 
 import "./Bank.sol";
-import "../management/EpochLocker.sol";
-import "../token/LockerToken.sol";
+import "EpochLocker.sol";
+import "LockerToken.sol";
+
+pragma solidity ^0.4.11;
 
 contract CollaborationBank is Bank, EpochLocker {
     

@@ -1,5 +1,3 @@
-pragma solidity ^0.4.8;
-
 /**
  * AbstractToken ECR20-compliant token contract
  * Child should implement initial supply or minting and overwite base
@@ -9,6 +7,8 @@ pragma solidity ^0.4.8;
  */
 
 import "./Token.sol";
+
+pragma solidity ^0.4.11;
 
 // AbstractToken, ECR20 tokens that all belong to the owner for sending around
 contract AbstractToken is Token {

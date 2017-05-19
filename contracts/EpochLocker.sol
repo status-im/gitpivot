@@ -1,11 +1,11 @@
-pragma solidity ^0.4.8;
-
 /**
  * Abstract contract that locks and unlock in period of a time.
  * 
  */
 
-import "lib/ethereans/management/Lockable.sol";
+import "Lockable.sol";
+
+pragma solidity ^0.4.11;
 
 contract EpochLocker is Lockable {
 

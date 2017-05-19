@@ -8,7 +8,7 @@ pragma solidity ^0.4.0;
  */
 
 import "./AbstractToken.sol";
-import "../management/Lockable.sol";
+import "Lockable.sol";
 
 contract LockerToken is AbstractToken, Lockable, Owned {
     Lockable public locker = this;

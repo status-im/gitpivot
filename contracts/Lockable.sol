@@ -1,6 +1,6 @@
-pragma solidity ^0.4.8;
-
 import "./Owned.sol";
+
+pragma solidity ^0.4.8;
 
 contract Lockable {
     bool public lock = true;
