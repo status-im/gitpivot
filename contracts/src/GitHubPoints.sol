@@ -1,26 +1,29 @@
-import "lib/oraclize/oraclizeAPI_0.4.sol";
-import "lib/ethereans/management/Owned.sol";
-import "lib/strings.sol";
+import "oraclizeAPI_0.4.sol";
+import "Owned.sol";
+import "strings.sol";
 
 pragma solidity ^0.4.11;
 
 contract DGitI {
-    function __setHead(uint256 projectId, string branch, bytes20 head);
-    function __setTail(uint256 projectId, string branch, bytes20 tail);
+    function __setHead(uint256 projectId, string head);
+    function __setTail(uint256 projectId, string tail);
     function __newPoints(uint256 projectId, uint256 userId, uint total);
+    function __pendingScan(uint256 projectId, string lastCommit, string pendingTail);
     function __setIssue(uint256 projectId, uint256 issueId, bool state, uint256 closedAt);
     function __setIssuePoints(uint256 projectId, uint256 issueId, uint256 userId, uint256 points);
 }
 
 contract GitHubPoints is Owned, usingOraclize{
-
+    
+    using strings for string;
+    using strings for strings.slice;
+    
     string private cred = ""; 
     string private script = "";
     
-    enum OracleType { CLAIM_COMMIT, CLAIM_CONTINUE, UPDATE_ISSUE }
-    mapping (bytes32 => OracleType) claimType; //temporary db enumerating oraclize calls
-    mapping (bytes32 => bytes20) commitClaim; //temporary db for oraclize commit token claim calls
-    mapping (bytes32 => Request) request; //temporary db
+    enum Command { UPDATE, RESUME, ISSUE }
+    mapping (bytes32 => Command) command; //temporary db enumerating oraclize calls
+    mapping (bytes32 => string) lastCommits; //temporary db for oraclize commit token claim calls
     
     //stores temporary data for oraclize repository commit claim
     struct CommitClaim {
@@ -28,86 +31,62 @@ contract GitHubPoints is Owned, usingOraclize{
         bytes20 commitid;
     }
     
-    struct Request {
-        address caller;
-        OracleType ot;
-    }
-
-    function _query_start(string _repository, string _branch, string _cred) internal {
-        strConcat("[computation] ['", script, "', 'update-new', '", _repository, strConcat("','", _branch,"', '", _cred,"']"))
-    }
-
-    function start(string _repository, string _branch, string _cred) payable only_owner {
+    function update(string _repository, string _branch, string _lastCommit, string _cred) payable only_owner {
         if(bytes(_cred).length == 0) _cred = cred; 
-        bytes32 ocid = oraclize_query("nested", _query_start(_repository,_branch,_cred));
-        claimType[ocid] = OracleType.CLAIM_COMMIT;
-        request[ocid].caller = msg.sender;
-        request[ocid].ot = OracleType.CLAIM_COMMIT;
-    }
-    
-    function update(string _repository, string _branch, string _commitid, string _cred) payable only_owner {
-        if(bytes(_cred).length == 0) _cred = cred; 
-        bytes32 ocid = oraclize_query("nested", _query_update(_repository,_branch,_commitid,_cred));
-        claimType[ocid] = OracleType.CLAIM_COMMIT;
-        commitClaim[ocid] = toBytes20(_commitid);
-        request[ocid].caller = msg.sender;
-        request[ocid].ot = OracleType.CLAIM_COMMIT;
+        bytes32 ocid = oraclize_query("nested", _query_update(_repository,_branch,_lastCommit,_cred));
+        command[ocid] = Command.UPDATE;
+        lastCommits[ocid] = _lastCommit;
     }
     
     function resume(string _repository, string _branch, string _lastCommit, string _limitCommit, string _cred)
-     payable only_owner{
+     payable only_owner {
         if(bytes(_cred).length == 0) _cred = cred; 
         bytes32 ocid = oraclize_query("nested", _query_resume(_repository,_branch,_lastCommit,_limitCommit,_cred));
-        claimType[ocid] = OracleType.CLAIM_CONTINUE;
-        commitClaim[ocid] = toBytes20(_lastCommit);
-        request[ocid].caller = msg.sender;
-        request[ocid].ot = OracleType.CLAIM_CONTINUE;
+        command[ocid] = Command.RESUME;
+        lastCommits[ocid] = _lastCommit;
     }
     
-    function issue(string _repository, string issue, string _cred)
-     payable only_owner{
+    function issue(string _repository, string _issue, string _cred)
+     payable only_owner {
         if(bytes(_cred).length == 0) _cred = cred; 
+        command[ocid] = Command.ISSUE;
         bytes32 ocid = oraclize_query("nested", _query_issue(_repository,_issue,_cred));
-        request[ocid].caller = msg.sender;
-        request[ocid].ot = OracleType.UPDATE_ISSUE;
     }
     
     event OracleEvent(bytes32 myid, string result, bytes proof);
     //oraclize response callback
     function __callback(bytes32 myid, string result, bytes proof) {
         OracleEvent(myid, result, proof);
-        if (msg.sender != oraclize.cbAddress()){
-          throw;  
-        }else if(claimType[myid] == OracleType.UPDATE_ISSUE){
-            _updateIssue(myid, result);
-        }else{
-             _updateCommits(commitClaim[myid], result,claimType[myid]==OracleType.CLAIM_CONTINUE);
+        if (msg.sender != oraclize.cbAddress()) throw; 
+        Command comm = command[myid];
+        if(comm == Command.UPDATE) {
+            _update(lastCommits[myid], result);
+        }else if(comm == Command.ISSUE) {
+            _issue(result);
+        }else if (comm == Command.RESUME) {
+             _resume(lastCommits[myid], result);
+             delete lastCommits[myid];
         }
-        delete claimType[myid];  //should always be deleted
+        delete command[myid];
     }
 
-    function _updateCommits(bytes20 oldCommit, string result, bool resume) internal {
+    function _update(string _lastCommit, string result) internal {
         DGitI dGit = DGitI(owner);
         bytes memory v = bytes(result);
         uint8 pos = 0;
         string memory temp;
         uint256 projectId; 
         (projectId,pos) = getNextUInt(v,pos);
-        string memory branch;
-        (branch,pos) = getNextString(v,pos);
-        (temp,pos) = getNextString(v,pos);
-        bytes20 head = toBytes20(temp);
-        (temp,pos) = getNextString(v,pos);
-        bytes20 tail = toBytes20(temp);
-        dGit.__setHead(projectId,branch,head);
-        if(resume){
-            dGit.__setTail(projectId,branch,tail);    
-        }else{
-            if(oldCommit == 0x0){
-                dGit.__setTail(projectId,branch,tail);    
-            }else if (oldCommit != tail){
-                //TODO: acceptContinueUpdateUntilLimit(tail,oldCommit)
-            }
+        (temp,pos) = getNextString(v,pos); //branch
+        (temp,pos) = getNextString(v,pos); //head
+        dGit.__setHead(projectId,temp); //head
+        
+        (temp,pos) = getNextString(v,pos); //tail
+        if(bytes(_lastCommit).length == 0){
+            dGit.__setTail(projectId,temp);    
+        }
+        if (sha3(_lastCommit) != sha3(temp)){ //update didn't reached _lastCommit
+            dGit.__pendingScan(projectId,_lastCommit,temp);
         }
         uint numAuthors;
         (numAuthors,pos) = getNextUInt(v,pos);
@@ -119,9 +98,34 @@ contract GitHubPoints is Owned, usingOraclize{
             dGit.__newPoints(projectId,userId,points);
         }
     }
+
+    function _resume(string _lastCommit, string result) internal {
+        DGitI dGit = DGitI(owner);
+        bytes memory v = bytes(result);
+        uint8 pos = 0;
+        string memory temp;
+        uint256 projectId; 
+        (projectId,pos) = getNextUInt(v,pos);
+        string memory branch;
+        (branch,pos) = getNextString(v,pos);
+        string memory head;
+        (head,pos) = getNextString(v,pos);
+        string memory tail;
+        (tail,pos) = getNextString(v,pos);
+        dGit.__setTail(projectId,tail);    
+        uint numAuthors;
+        (numAuthors,pos) = getNextUInt(v,pos);
+        uint userId;
+        uint points;
+        for(uint i; i < numAuthors; i++){
+            (userId,pos) = getNextUInt(v,pos);
+            (points,pos) = getNextUInt(v,pos);
+            dGit.__newPoints(projectId,userId,points);
+        }
+    }
     
-    function _updateIssue(bytes32 myid, string result) internal {
-        DGitI dGit = DGitI(request[myid].caller);
+    function _issue(string result) internal {
+        DGitI dGit = DGitI(owner);
         bytes memory v = bytes(result);
         uint8 pos = 0;
         string memory temp;
@@ -178,14 +182,6 @@ contract GitHubPoints is Owned, usingOraclize{
        cm[2] = strings.toSlice("']");
        return strings.toSlice("").join(cm);        
     }
-    
-    function _query_start(string _repository, string _branch, string _cred)  internal returns (string)  {
-       strings.slice memory comma = strings.toSlice(",");
-       strings.slice [] memory cm = new strings.slice[](2);
-       cm[0] = _repository.toSlice();
-       cm[1] = _branch.toSlice();
-       return _query_script("update",comma.join(cm),_cred);
-    }
 
     function _query_update(string _repository, string _branch, string _lastCommit, string _cred)  internal returns (string)  {
        strings.slice memory comma = strings.toSlice(",");
@@ -214,25 +210,6 @@ contract GitHubPoints is Owned, usingOraclize{
        return _query_script("resume",comma.join(cm),_cred);
     }
     
-    //"ethereans/TheEtherian","master","client,secret"
-    function query_start(string _repository, string _branch, string _cred)  constant returns (string)  {
-        return _query_start(_repository,_branch,_cred);
-    }
-    
-    //"ethereans/TheEtherian","master","3258ebfded07a6e35d400994db507e456e194716","client,secret"
-    function query_update(string _repository, string _branch, string _lastCommit, string _cred)  constant returns (string)  {
-        return _query_update(_repository,_branch,_lastCommit,_cred);
-    }
-    
-    //"ethereans/TheEtherian","master","3258ebfded07a6e35d400994db507e456e194716","3acd26bf0f1f68ac2d7d26bfceb624bb0f01593a","client,secret"
-    function query_resume(string _repository, string _branch, string _lastCommit, string _limitCommit, string _cred)  constant returns (string)  {
-        return _query_resume(_repository,_branch,_lastCommit,_limitCommit,_cred);
-    }
-    
-    //"ethereans/TheEtherian","1","client,secret"
-    function query_issue(string _repository, string _issue, string _cred)  constant returns (string)  {
-        return _query_issue(_repository,_issue,_cred);
-    }
 
     function toBytes20(string memory source) internal constant returns (bytes20 result) {
         assembly {
@@ -295,7 +272,7 @@ contract GitHubPoints is Owned, usingOraclize{
     }
 }
 
-library GitHubPointsFactory {
+library GHPoints {
 
     function create() returns (GitHubPoints){
         return new GitHubPoints("");

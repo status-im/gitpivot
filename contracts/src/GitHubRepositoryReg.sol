@@ -7,11 +7,14 @@
 import "./GitHubAPIReg.sol";
 import "./NameRegistry.sol";
 import "./GitRepository.sol";
+import "strings.sol";
 
 pragma solidity ^0.4.11;
 
 contract GitHubRepositoryReg is NameRegistry, GitHubAPIReg {
-
+    using strings for string;
+    using strings for strings.slice;
+    
     mapping (uint256 => Repository) public repositories; 
 
     event NewRepository(address addr, uint256 projectId, string full_name, string default_branch);
@@ -22,8 +25,10 @@ contract GitHubRepositoryReg is NameRegistry, GitHubAPIReg {
         string branch; 
     }
 
-    function register(string _repository) payable {
-       oraclize_query("URL", _getQuery(_repository), getAddr(_repository) == 0x00? 4000000 : 1000000);
+    function register(string _repository, string _cred) payable {
+        if(bytes(_cred).length == 0) _cred = cred; 
+        uint gas = getAddr(_repository) == 0x00? 4000000 : 1000000;
+        oraclize_query("URL", _query_script(_repository,_cred), gas);
     }
 
     function getAddr(uint256 _id) public constant returns(address addr) {
@@ -48,11 +53,11 @@ contract GitHubRepositoryReg is NameRegistry, GitHubAPIReg {
         if (msg.sender != oraclize.cbAddress()){
           throw;  
         }else {
-            _setRepository(myid, result);
+            _setRepository(result);
         }
     }
 
-    function _setRepository(bytes32 myid, string result) internal //[85743750, "ethereans/TheEtherian", "master"]
+    function _setRepository(string result) internal //[85743750, "ethereans/TheEtherian", "master"]
     {
         bytes memory v = bytes(result);
         uint8 pos = 0;
@@ -64,7 +69,9 @@ contract GitHubRepositoryReg is NameRegistry, GitHubAPIReg {
         (default_branch,pos) = getNextString(v,pos);
         address repoAddr = repositories[projectId].addr;
         if(repoAddr == 0x0){   
-            //repoAddr = address(GitFactory.newGitRepository(projectId, full_name, default_branch));
+            GitRepositoryI repo = GitFactory.newGitRepository(projectId, full_name);
+            repo.setOwner(owner);
+            repoAddr = address(repo);
             indexes[sha3(repoAddr)] = projectId; 
             indexes[sha3(full_name)] = projectId;
             NewRepository(repoAddr, projectId, full_name, default_branch);
@@ -78,12 +85,16 @@ contract GitHubRepositoryReg is NameRegistry, GitHubAPIReg {
         }
     }
     //internal helper functions
-    function _getQuery(string _repository) internal constant returns (string){
-        return strConcat("json(https://api.github.com/repos/",_repository,credentials,").$.id,full_name,default_branch");
+    function _query_script(string _repository, string _cred) internal returns (string)  {
+       strings.slice [] memory cm  = new strings.slice[](5);
+       cm[0] = strings.toSlice("json(https://api.github.com/repos/");
+       cm[1] = _repository.toSlice();
+       cm[2] = _cred.toSlice();
+       cm[4] = strings.toSlice(").$.id,full_name,default_branch");
+       return strings.toSlice("").join(cm);        
     }
-
 }
-library GitHubRepositoryRegFactory {
+library GHRepoReg {
 
     function create() returns (GitHubRepositoryReg){
         return new GitHubRepositoryReg();

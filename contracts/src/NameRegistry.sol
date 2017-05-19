@@ -3,7 +3,7 @@
  * Interface for Name Registries.
  * Ricardo Guilherme Schmidt <3esmit@gmail.com>
  */
-pragma solidity ^0.4.9;
+pragma solidity ^0.4.11;
 
 contract NameRegistry {
     function getAddr(uint256 _id) public constant returns(address addr);

@@ -1,5 +1,3 @@
-pragma solidity ^0.4.8;
-
 /**
  * Contract that mint tokens by github commit stats
  * 
@@ -15,17 +13,20 @@ pragma solidity ^0.4.8;
  * Released under GPLv3 License
  */
  
-import "lib/ethereans/bank/CollaborationBank.sol";
-import "lib/ethereans/management/Owned.sol";
+import "CollaborationBank.sol";
+import "Owned.sol";
 import "./BountyBank.sol";
 import "./GitRepositoryToken.sol";
 
+pragma solidity ^0.4.11;
 
-contract GitRepositoryI {
+contract GitRepositoryI is Owned{
     function claim(address _user, uint _total) returns (bool) ; 
+    function setBounty(uint256 _issueId, bool _state, uint256 _closedAt);
+    function setBountyPoints(uint256 _issueId,  address _claimer, uint256 _points);
 }
 
-contract GitRepository is GitRepositoryI, Owned {
+contract GitRepository is GitRepositoryI {
 
     GitRepositoryToken public token;
     CollaborationBank public donationBank;
@@ -49,7 +50,6 @@ contract GitRepository is GitRepositoryI, Owned {
        bountyBank = new BountyBank();
     }
     
-
     //oracle claim request
     function claim(address _user, uint _total) 
      only_owner returns (bool) {
@@ -61,15 +61,15 @@ contract GitRepository is GitRepositoryI, Owned {
         }
     }
     
-    function bountyState(uint issue, bool open) only_owner {
-       if (open) bountyBank.open(issue);
-       else bountyBank.close(issue);
+    function setBounty(uint256 _issueId, bool _state, uint256 _closedAt) only_owner {
+        if (_state) bountyBank.open(_issueId);
+        else bountyBank.close(_issueId,_closedAt);
     }
     
-    function bountyState(uint issue, address claimer, uint points) only_owner {
-       bountyBank.setClaimer(issue,claimer,points);
-    }
-    
+    function setBountyPoints(uint256 _issueId, address _claimer, uint256 _points) only_owner {
+        bountyBank.setClaimer(_issueId,_claimer,_points);
+    }   
+
 }
 
 library GitFactory {

@@ -1,5 +1,3 @@
-pragma solidity ^0.4.8;
-
 /**
  * Contract that mint tokens by github commit stats
  * 
@@ -15,8 +13,10 @@ pragma solidity ^0.4.8;
  * Released under GPLv3 License
  */
 
-import "lib/ethereans/token/LockerToken.sol";
-import "lib/ethereans/management/Owned.sol";
+import "LockerToken.sol";
+import "Owned.sol";
+
+pragma solidity ^0.4.11;
 
 contract GitRepositoryToken is LockerToken {
 

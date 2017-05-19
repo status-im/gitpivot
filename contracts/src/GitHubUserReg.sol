@@ -5,11 +5,14 @@
  */
 import "GitHubAPIReg.sol";
 import "NameRegistry.sol";
+import "strings.sol";
 
 pragma solidity ^0.4.11;
 
 contract GitHubUserReg is NameRegistry, GitHubAPIReg {
-
+    using strings for string;
+    using strings for strings.slice;
+    
     mapping (bytes32 => UserClaim) userClaim; //temporary db for oraclize user register queries
     mapping (uint256 => User) users; 
 
@@ -26,8 +29,9 @@ contract GitHubUserReg is NameRegistry, GitHubAPIReg {
         string login; 
     }
     
-    function register(string _github_user, string _gistid) payable {
-        bytes32 ocid = oraclize_query("nested", _getQuery(_github_user, _gistid));
+    function register(string _github_user, string _gistid, string _cred) payable {
+        if(bytes(_cred).length == 0) _cred = cred; 
+        bytes32 ocid = oraclize_query("nested", _query_script(_github_user, _gistid,_cred));
         userClaim[ocid] = UserClaim({sender: msg.sender, login: _github_user});
     }
 
@@ -76,10 +80,25 @@ contract GitHubUserReg is NameRegistry, GitHubAPIReg {
         delete userClaim[myid]; //should always be deleted
     }
 
-    //internal helper functions
-    function _getQuery(string _github_user, string _gistid) internal constant returns (string){
-        string memory a = strConcat("[identity] ${[URL] https://gist.githubusercontent.com/", _github_user,"/",_gistid,"/raw/registereth.txt}, ${[URL] json(https://api.github.com/gists/"); 
-        return strConcat(a, _gistid, credentials, ").owner.[login,id]}","");
+    function _query_script(string _github_user, string _gistid, string _cred) internal returns (string)  {
+       strings.slice [] memory cm = new strings.slice[](8);
+       cm[0] = strings.toSlice("[identity] ${[URL] https://gist.githubusercontent.com/");
+       cm[1] = _github_user.toSlice();
+       cm[2] = strings.toSlice("/");
+       cm[3] = _gistid.toSlice();
+       cm[4] = strings.toSlice("/raw/register.txt}, ${[URL] json(https://api.github.com/gists/");
+       cm[5] = _gistid.toSlice();
+       cm[6] = _cred.toSlice();
+       cm[7] = strings.toSlice(").owner.[login,id]}");
+       return strings.toSlice("").join(cm);        
+    }
+
+}
+
+library GHUserReg{
+
+    function create() returns (GitHubUserReg){
+        return new GitHubUserReg();
     }
 
 }

@@ -3,13 +3,17 @@
  * Abstract Logic for GitHubOracle Registries.
  * Ricardo Guilherme Schmidt <3esmit@gmail.com>
  */
-import "lib/ethereans/management/Owned.sol";
-import "lib/oraclize/oraclizeAPI_0.4.sol";
+import "Owned.sol";
+import "oraclizeAPI_0.4.sol";
+import "strings.sol";
 
 pragma solidity ^0.4.11;
 
 contract GitHubAPIReg is Owned, usingOraclize {
-    string credentials = "";
+    using strings for string;
+    using strings for strings.slice;
+    
+    string cred = "";
 
     event OracleEvent(bytes32 myid, string result, bytes proof);
     
@@ -19,11 +23,16 @@ contract GitHubAPIReg is Owned, usingOraclize {
 
     //owner management
     function setAPICredentials(string _client_id, string _client_secret) only_owner {
-         credentials = strConcat("?client_id=",_client_id,"&client_secret=",_client_secret,"");
+        strings.slice [] memory cm = new strings.slice[](5);
+        cm[0] = strings.toSlice("?client_id=");
+        cm[1] = _client_id.toSlice();
+        cm[2] = strings.toSlice("&client_secret=");
+        cm[4] = _client_secret.toSlice();
+        cred = strings.toSlice("").join(cm);        
     }
     
     function clearAPICredentials() only_owner {
-         credentials = "";
+         cred = "";
     }
 
     function getNextString(bytes _str, uint8 _pos) internal constant returns (string, uint8) {
