@@ -1,7 +1,7 @@
-pragma solidity ^0.4.9; 
- 
-import "lib/ethereans/management/Owned.sol";
- 
+import "Owned.sol";
+
+pragma solidity ^0.4.11;
+
 contract BountyBank is Owned {
     
     enum State {CLOSED, OPEN, CLAIMED}
@@ -42,10 +42,10 @@ contract BountyBank is Owned {
         bounties[num].points += points;
     }
 
-    function close(uint num) only_owner {
+    function close(uint num, uint _closedAt) only_owner {
          if(bounties[num].state == State.CLAIMED) throw;
          bounties[num].state = State.CLOSED;
-         bounties[num].closedAt = now;
+         bounties[num].closedAt = _closedAt;
     }
      
     function claim(uint num){
