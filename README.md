@@ -1,19 +1,23 @@
-# GitHubOracle 
+# GitHubOracle
+
 Tokenize github repositories by commits and issues. Accept donations in eth tokens, distribute donations and bounties to code commiters.
- 
-## Usage 
-  
+
+## Usage
+
 ## User Registration
+
 Create a gist in your github containing in it's body only an ethereum address you own.   
-Must be in first line with no spaces and no more lines.    
+Must be in first line with no spaces and no more lines.
 Call `DGit.register("<your_github_login>","<your gistid>")`  (oracle cost ~0.06 USD)  
 Example: `DGit.register("3esmit","31a58f2ddf2258697cce1b969e7c298b")`   
- 
-## Repository    
-Call `DGit.addRepository("<owner>/<repository>")`  (oracle cost ~0.06 USD)  
-Example:  `DGit.addRepository("status-im/github-oracle")`    
- 
-### Tokenize Contributions   
+
+## Repository
+
+Call `DGit.addRepository("<owner>/<repository>")`  (oracle cost ~0.06 USD)
+Example:  `DGit.addRepository("status-im/github-oracle")`
+
+### Tokenize Contributions
+
 Push your commits to GitHub and simply call `DGit.updateCommits("<owner>/<repository>")`    
 This call will cost $0.54 USD and can process up to 4000 commits.   
 Call `DGit.continueCommits("<owner>/<repository>")` (oracle cost ~0.54 USD)  

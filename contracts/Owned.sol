@@ -1,12 +1,8 @@
-pragma solidity ^0.4.8;
+pragma solidity ^0.4.11;
 
 contract Owned {
     address public owner= msg.sender;
     event NewOwner(address owner);
-    
-    function Owned(){
-        NewOwner(owner);
-    }
     
     modifier only_owner {
         if (msg.sender != owner) throw;

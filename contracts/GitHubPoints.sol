@@ -21,14 +21,21 @@ contract GitHubPoints is Owned, usingOraclize{
     string private cred = ""; 
     string private script = "";
     
-    enum Command { UPDATE, RESUME, ISSUE }
+    enum Command { START, UPDATE, RESUME, ISSUE }
     mapping (bytes32 => Command) command; //temporary db enumerating oraclize calls
     mapping (bytes32 => string) lastCommits; //temporary db for oraclize commit token claim calls
-    
+    mapping (bytes32 => string) branches; 
     //stores temporary data for oraclize repository commit claim
     struct CommitClaim {
         string repository;
         bytes20 commitid;
+    }
+    
+    function start(string _repository, string _branch, string _cred) payable only_owner {
+        if(bytes(_cred).length == 0) _cred = cred; 
+        bytes32 ocid = oraclize_query("nested", _query_start(_repository,_branch,_cred));
+        command[ocid] = Command.START;
+        branches[ocid] = _branch;
     }
     
     function update(string _repository, string _branch, string _lastCommit, string _cred) payable only_owner {
@@ -36,6 +43,7 @@ contract GitHubPoints is Owned, usingOraclize{
         bytes32 ocid = oraclize_query("nested", _query_update(_repository,_branch,_lastCommit,_cred));
         command[ocid] = Command.UPDATE;
         lastCommits[ocid] = _lastCommit;
+        branches[ocid] = _branch;
     }
     
     function resume(string _repository, string _branch, string _lastCommit, string _limitCommit, string _cred)
@@ -44,6 +52,7 @@ contract GitHubPoints is Owned, usingOraclize{
         bytes32 ocid = oraclize_query("nested", _query_resume(_repository,_branch,_lastCommit,_limitCommit,_cred));
         command[ocid] = Command.RESUME;
         lastCommits[ocid] = _lastCommit;
+        branches[ocid] = _branch;
     }
     
     function issue(string _repository, string _issue, string _cred)
@@ -60,17 +69,22 @@ contract GitHubPoints is Owned, usingOraclize{
         if (msg.sender != oraclize.cbAddress()) throw; 
         Command comm = command[myid];
         if(comm == Command.UPDATE) {
-            _update(lastCommits[myid], result);
+            _update(branches[myid],lastCommits[myid], result);
+            delete branches[myid];
         }else if(comm == Command.ISSUE) {
             _issue(result);
         }else if (comm == Command.RESUME) {
-             _resume(lastCommits[myid], result);
+             _resume(branches[myid],lastCommits[myid], result);
              delete lastCommits[myid];
+             delete branches[myid];
+        }else if (comm == Command.START) {
+             _start(branches[myid],result);
+             delete branches[myid];
         }
         delete command[myid];
     }
 
-    function _update(string _lastCommit, string result) internal {
+    function _start(string _branch, string result) internal {
         DGitI dGit = DGitI(owner);
         bytes memory v = bytes(result);
         uint8 pos = 0;
@@ -78,6 +92,32 @@ contract GitHubPoints is Owned, usingOraclize{
         uint256 projectId; 
         (projectId,pos) = getNextUInt(v,pos);
         (temp,pos) = getNextString(v,pos); //branch
+        if(sha3(_branch) != sha3(temp)) return;
+        (temp,pos) = getNextString(v,pos); //head
+        dGit.__setHead(projectId,temp); //head
+        (temp,pos) = getNextString(v,pos); //tail
+        
+        dGit.__setTail(projectId,temp);    
+        uint numAuthors;
+        (numAuthors,pos) = getNextUInt(v,pos);
+        uint userId;
+        uint points;
+        for(uint i; i < numAuthors; i++){
+            (userId,pos) = getNextUInt(v,pos);
+            (points,pos) = getNextUInt(v,pos);
+            dGit.__newPoints(projectId,userId,points);
+        }
+    }
+
+    function _update(string _branch, string _lastCommit, string result) internal {
+        DGitI dGit = DGitI(owner);
+        bytes memory v = bytes(result);
+        uint8 pos = 0;
+        string memory temp;
+        uint256 projectId; 
+        (projectId,pos) = getNextUInt(v,pos);
+        (temp,pos) = getNextString(v,pos); //branch
+        if(sha3(_branch) != sha3(temp)) return;
         (temp,pos) = getNextString(v,pos); //head
         dGit.__setHead(projectId,temp); //head
         
@@ -99,7 +139,7 @@ contract GitHubPoints is Owned, usingOraclize{
         }
     }
 
-    function _resume(string _lastCommit, string result) internal {
+    function _resume(string _branch, string _lastCommit, string result) internal {
         DGitI dGit = DGitI(owner);
         bytes memory v = bytes(result);
         uint8 pos = 0;
@@ -108,6 +148,7 @@ contract GitHubPoints is Owned, usingOraclize{
         (projectId,pos) = getNextUInt(v,pos);
         string memory branch;
         (branch,pos) = getNextString(v,pos);
+        if(sha3(_branch) != sha3(branch)) return;
         string memory head;
         (head,pos) = getNextString(v,pos);
         string memory tail;
@@ -182,7 +223,15 @@ contract GitHubPoints is Owned, usingOraclize{
        cm[2] = strings.toSlice("']");
        return strings.toSlice("").join(cm);        
     }
-
+    
+    function _query_start(string _repository, string _branch, string _cred)  internal returns (string)  {
+       strings.slice memory comma = strings.toSlice(",");
+       strings.slice [] memory cm = new strings.slice[](2);
+       cm[0] = _repository.toSlice();
+       cm[1] = _branch.toSlice();
+       return _query_script("start",comma.join(cm),_cred);
+    }
+    
     function _query_update(string _repository, string _branch, string _lastCommit, string _cred)  internal returns (string)  {
        strings.slice memory comma = strings.toSlice(",");
        strings.slice [] memory cm = new strings.slice[](3);
@@ -207,7 +256,7 @@ contract GitHubPoints is Owned, usingOraclize{
        strings.slice [] memory cm = new strings.slice[](2);
        cm[0] = _repository.toSlice();
        cm[1] = _issue.toSlice();
-       return _query_script("resume",comma.join(cm),_cred);
+       return _query_script("issue",comma.join(cm),_cred);
     }
     
 
@@ -274,8 +323,8 @@ contract GitHubPoints is Owned, usingOraclize{
 
 library GHPoints {
 
-    function create() returns (GitHubPoints){
-        return new GitHubPoints("");
+    function create(string _script) returns (GitHubPoints){
+        return new GitHubPoints(_script);
     }
 
 }
