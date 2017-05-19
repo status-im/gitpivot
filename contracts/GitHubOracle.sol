@@ -41,16 +41,23 @@ contract GitHubOracle is Owned, DGitI {
         mapping (string => string) pending;
     }
     
-    function initialize() only_owner {
+    function __init_regs() only_owner {
         if(address(userReg) == 0x0){
             userReg = GHUserReg.create();
-        }else if(address(repositoryReg) == 0x0){
+        }
+        if(address(repositoryReg) == 0x0){
             repositoryReg = GHRepoReg.create();
-        }else if(address(gitHubPoints) == 0x0){
-            gitHubPoints = GHPoints.create();
-        }else throw;
+        }
     }
 
+    function __set_points_script(string _arg) only_owner {
+        if(address(gitHubPoints) == 0x0){
+            gitHubPoints = GHPoints.create(_arg);
+        }else {
+            gitHubPoints.setScript(_arg);
+        }
+    }
+    
     function update(string _repository, string _token) payable {
         uint256 repoId = repositoryReg.getId(_repository);
         if(repoId == 0) throw;
