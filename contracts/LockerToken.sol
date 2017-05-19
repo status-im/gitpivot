@@ -1,5 +1,3 @@
-pragma solidity ^0.4.0;
-
 /**
  * Abstract contract to accept lock and linked locker. 
  * 
@@ -9,6 +7,8 @@ pragma solidity ^0.4.0;
 
 import "./AbstractToken.sol";
 import "Lockable.sol";
+
+pragma solidity ^0.4.11;
 
 contract LockerToken is AbstractToken, Lockable, Owned {
     Lockable public locker = this;
