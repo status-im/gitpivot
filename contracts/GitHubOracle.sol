@@ -58,6 +58,12 @@ contract GitHubOracle is Owned, DGitI {
         }
     }
     
+    function __setController(address __newcontroller) only_owner {
+        userReg.setOwner(newContract);
+        repoReg.setOwner(newContract);
+        gitHubPoints.setOwner(newContract);
+    }
+
     function update(string _repository, string _token) payable {
         uint256 repoId = repositoryReg.getId(_repository);
         if(repoId == 0) throw;
