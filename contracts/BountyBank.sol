@@ -31,18 +31,18 @@ contract BountyBank is Controlled {
          if(!msg.sender.send(value)) throw;
     }
 
-    function open(uint num) only_owner {
+    function open(uint num) onlyController {
          if(bounties[num].state == State.CLAIMED) throw;
          bounties[num].state = State.OPEN;
     }
 
-    function setClaimer(uint num, address claimer, uint points) only_owner {
+    function setClaimer(uint num, address claimer, uint points) onlyController {
         if(bounties[num].state == State.CLAIMED) throw;
         bounties[num].claimers[claimer] += points;
         bounties[num].points += points;
     }
 
-    function close(uint num, uint _closedAt) only_owner {
+    function close(uint num, uint _closedAt) onlyController {
          if(bounties[num].state == State.CLAIMED) throw;
          bounties[num].state = State.CLOSED;
          bounties[num].closedAt = _closedAt;
