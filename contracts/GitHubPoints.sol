@@ -1,5 +1,5 @@
 import "oraclizeAPI_0.4.sol";
-import "Owned.sol";
+import "Controlled.sol";
 import "strings.sol";
 
 pragma solidity ^0.4.11;
@@ -13,7 +13,7 @@ contract DGitI {
     function __setIssuePoints(uint256 projectId, uint256 issueId, uint256 userId, uint256 points);
 }
 
-contract GitHubPoints is Owned, usingOraclize{
+contract GitHubPoints is Controlled, usingOraclize{
     
     using strings for string;
     using strings for strings.slice;

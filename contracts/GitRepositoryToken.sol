@@ -14,7 +14,7 @@
  */
 
 import "LockerToken.sol";
-import "Owned.sol";
+import "Controlled.sol";
 
 pragma solidity ^0.4.11;
 

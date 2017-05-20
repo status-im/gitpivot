@@ -7,10 +7,11 @@
 
 import "./AbstractToken.sol";
 import "Lockable.sol";
+import "Controlled.sol";
 
 pragma solidity ^0.4.11;
 
-contract LockerToken is AbstractToken, Lockable, Owned {
+contract LockerToken is AbstractToken, Lockable, Controlled {
     Lockable public locker = this;
 
     function unlinkLocker() only_owner {

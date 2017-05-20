@@ -1,8 +1,8 @@
-import "Owned.sol";
+import "Controlled.sol";
 
 pragma solidity ^0.4.11;
 
-contract BountyBank is Owned {
+contract BountyBank is Controlled {
     
     enum State {CLOSED, OPEN, CLAIMED}
     

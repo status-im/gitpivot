@@ -14,14 +14,14 @@
  */
  
 import "oraclizeAPI_0.4.sol";
-import "Owned.sol";
+import "Controlled.sol";
 import "./GitHubUserReg.sol";
 import "./GitHubRepositoryReg.sol";
 import "./GitHubPoints.sol";
 
 pragma solidity ^0.4.11;
 
-contract GitHubOracle is Owned, DGitI {
+contract GitHubOracle is Controlled, DGitI {
 
     GitHubUserReg public userReg;
     GitHubRepositoryReg public repositoryReg;

@@ -3,13 +3,13 @@
  * Abstract Logic for GitHubOracle Registries.
  * Ricardo Guilherme Schmidt <3esmit@gmail.com>
  */
-import "Owned.sol";
+import "Controlled.sol";
 import "oraclizeAPI_0.4.sol";
 import "strings.sol";
 
 pragma solidity ^0.4.11;
 
-contract GitHubAPIReg is Owned, usingOraclize {
+contract GitHubAPIReg is Controlled, usingOraclize {
     using strings for string;
     using strings for strings.slice;
     
