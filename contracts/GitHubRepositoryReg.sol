@@ -22,7 +22,7 @@ contract GitHubRepositoryReg is NameRegistry, GitHubAPIReg {
     struct Repository {
         address addr; 
         string name;
-        string branch; 
+        bytes32 branch; 
     }
 
     function register(string _repository, string _cred) payable {
@@ -43,7 +43,7 @@ contract GitHubRepositoryReg is NameRegistry, GitHubAPIReg {
         return repositories[indexes[sha3(_name)]].addr;
     }
     
-    function getBranch(uint256 _id) public constant returns(string branch) {
+    function getBranch(uint256 _id) public constant returns(bytes32 branch) {
         return repositories[_id].branch;
     }
 
@@ -75,7 +75,7 @@ contract GitHubRepositoryReg is NameRegistry, GitHubAPIReg {
             indexes[sha3(repoAddr)] = projectId; 
             indexes[sha3(full_name)] = projectId;
             NewRepository(repoAddr, projectId, full_name, default_branch);
-            repositories[projectId] = Repository({addr: repoAddr, name: full_name, branch: default_branch});
+            repositories[projectId] = Repository({addr: repoAddr, name: full_name, branch: sha3(default_branch)});
         }else{
             bytes32 _new = sha3(full_name);
             bytes32 _old = sha3(repositories[projectId].name);
