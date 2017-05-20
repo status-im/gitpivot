@@ -29,64 +29,98 @@ contract GitHubOracle is Controlled, DGitI {
 
     mapping (uint256 => Repository) repositories;
     mapping (uint256 => mapping (uint256 => uint256)) pending;
-    
+
+    address public newContract;
+
     modifier oraclized {
         if(msg.sender != address(gitHubPoints)) throw;
         _;
     }
-    
+    modifier onlyUpgrading {
+        if(newContract == 0) throw;
+        _;
+    }
     struct Repository {
         string head;
         string tail;
         mapping (string => string) pending;
     }
-    
-    function __init_regs() onlyController {
-        if(address(userReg) == 0x0){
-            userReg = GHUserReg.create();
-        }
-        if(address(repositoryReg) == 0x0){
-            repositoryReg = GHRepoReg.create();
-        }
-    }
 
-    function __set_points_script(string _arg) onlyController {
-        if(address(gitHubPoints) == 0x0){
-            gitHubPoints = GHPoints.create(_arg);
-        }else {
-            gitHubPoints.setScript(_arg);
+    function upgrade(uint[] _repoIds) onlyUpgrading {
+        uint len = _repoIds.length;
+		for(uint i = 0; i < len; i++){
+            Controlled(repositoryReg.getAddr(_repoIds[i])).changeController(newContract);
         }
     }
     
-    function __changeController(address _newController) onlyController {
-        userReg.changeController(_newController);
-        repositoryReg.changeController(_newController);
-        gitHubPoints.changeController(_newController);
+    function start(string _repository, string _branch, string _token) payable {
+        uint256 repoId = repositoryReg.getId(_repository);
+        if(repoId == 0) throw;
+        if(repositoryReg.getBranch(repoId) != sha3(_branch)) throw;
+        gitHubPoints.start.value(msg.value)(_repository, _branch, _token);
+    }
+    
+    function update(string _repository, string _branch, string _token) payable {
+        uint256 repoId = repositoryReg.getId(_repository);
+        if(repoId == 0) throw;
+        if(repositoryReg.getBranch(repoId) != sha3(_branch)) throw;
+        gitHubPoints.update.value(msg.value)(_repository, _branch, repositories[repoId].head, _token);
     }
 
-    function update(string _repository, string _token) payable {
+    function resume(string _repository, string _branch, string _pendingTail, string _token) payable {
         uint256 repoId = repositoryReg.getId(_repository);
         if(repoId == 0) throw;
-        gitHubPoints.update.value(msg.value)(_repository, repositoryReg.getBranch(repoId), repositories[repoId].head, _token);
-    }
-    function resume(string _repository, string _pendingTail, string _token) payable {
-        uint256 repoId = repositoryReg.getId(_repository);
-        if(repoId == 0) throw;
-        string claimedCommit = repositories[repoid].pending[_pendingTail];
+        if(repositoryReg.getBranch(repoId) != sha3(_branch)) throw;
+        string claimedCommit = repositories[repoId].pending[_pendingTail];
         if(bytes(claimedCommit).length == 0) throw;
-        delete repositories[repoid].pending[_pendingTail];
-        gitHubPoints.resume.value(msg.value)(_repository, repositoryReg.getBranch(repoId), _pendingTail, claimedCommit, _token);
+        delete repositories[repoId].pending[_pendingTail];
+        gitHubPoints.resume.value(msg.value)(_repository, _branch, _pendingTail, claimedCommit, _token);
     }
-    function longtail(string _repository, string _token) payable {
+
+    function longtail(string _repository, string _branch, string _token) payable {
         uint256 repoId = repositoryReg.getId(_repository);
         if(repoId == 0) throw;
-        gitHubPoints.longtail.value(msg.value)(_repository, repositoryReg.getBranch(repoId), repositories[repoId].tail, _token);
+        if(repositoryReg.getBranch(repoId) != sha3(_branch)) throw;
+        gitHubPoints.longtail.value(msg.value)(_repository, _branch, repositories[repoId].tail, _token);
     }
     
     function issue(string _repository, string _issue, string _token) payable {
         gitHubPoints.issue.value(msg.value)(_repository,_issue,_token);
     }
     
+    //claims pending points
+    function claimPending(uint _repoId, uint _userId){
+        GitRepositoryI repoaddr = GitRepositoryI(repositoryReg.getAddr(_repoId));
+        uint total = pending[_userId][_repoId];
+        delete pending[_userId][_repoId];
+        if(!repoaddr.claim(userReg.getAddr(_userId), total)) throw;
+    }
+    
+    function __init_regs() onlyController {
+        if(address(userReg) == 0){
+            userReg = GHUserReg.create();
+        }
+        if(address(repositoryReg) == 0){
+            repositoryReg = GHRepoReg.create();
+        }
+    }
+
+    function __set_points_script(string _arg) onlyController {
+        if(address(gitHubPoints) == 0){
+            gitHubPoints = GHPoints.create(_arg);
+        } else {
+            gitHubPoints.setScript(_arg);
+        }
+    }
+    
+    function __upgrade_contract(address _newContract) onlyController {
+        userReg.changeController(_newContract);
+        repositoryReg.changeController(_newContract);
+        gitHubPoints.changeController(_newContract);
+        newContract = _newContract;
+        if(_newContract != 0) _newContract.send(this.balance);
+    }
+
     function __pendingScan(uint256 _projectId, string _lastCommit, string _pendingTail) oraclized {
         repositories[_projectId].pending[_pendingTail] = _lastCommit;
     }
@@ -124,14 +158,6 @@ contract GitHubOracle is Controlled, DGitI {
 		        pending[_userId][_repoId] += _uPoints;        
 		    }
 		}
-    }
-    
-    //claims pending points
-    function claimPending(uint _repoId, uint _userId){
-        GitRepositoryI repoaddr = GitRepositoryI(repositoryReg.getAddr(_repoId));
-        uint total = pending[_userId][_repoId];
-        delete pending[_userId][_repoId];
-        if(!repoaddr.claim(userReg.getAddr(_userId), total)) throw;
     }
         
 }
