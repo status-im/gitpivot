@@ -1,6 +1,6 @@
-pragma solidity ^0.4.8;
-
 // ECR20 standard token interface
+
+pragma solidity ^0.4.11;
 
 contract Token {
   uint256 public totalSupply;
