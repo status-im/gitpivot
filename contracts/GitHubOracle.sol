@@ -60,14 +60,27 @@ contract GitHubOracle is Controlled, DGitI {
     
     function __changeController(address _newController) onlyController {
         userReg.changeController(_newController);
-        repoReg.changeController(newContract);
-        gitHubPoints.changeController(newContract);
+        repositoryReg.changeController(_newController);
+        gitHubPoints.changeController(_newController);
     }
 
     function update(string _repository, string _token) payable {
         uint256 repoId = repositoryReg.getId(_repository);
         if(repoId == 0) throw;
-        gitHubPoints.update.value(msg.value)(_repository, "master", repositories[repoId].head,_token);
+        gitHubPoints.update.value(msg.value)(_repository, repositoryReg.getBranch(repoId), repositories[repoId].head, _token);
+    }
+    function resume(string _repository, string _pendingTail, string _token) payable {
+        uint256 repoId = repositoryReg.getId(_repository);
+        if(repoId == 0) throw;
+        string claimedCommit = repositories[repoid].pending[_pendingTail];
+        if(bytes(claimedCommit).length == 0) throw;
+        delete repositories[repoid].pending[_pendingTail];
+        gitHubPoints.resume.value(msg.value)(_repository, repositoryReg.getBranch(repoId), _pendingTail, claimedCommit, _token);
+    }
+    function longtail(string _repository, string _token) payable {
+        uint256 repoId = repositoryReg.getId(_repository);
+        if(repoId == 0) throw;
+        gitHubPoints.longtail.value(msg.value)(_repository, repositoryReg.getBranch(repoId), repositories[repoId].tail, _token);
     }
     
     function issue(string _repository, string _issue, string _token) payable {
@@ -91,21 +104,26 @@ contract GitHubOracle is Controlled, DGitI {
         repo.setBounty(_issueId, _state, _closedAt);
     }
          
-    function __setIssuePoints(uint256 _projectId, uint256 _issueId, uint256 _userId, uint256 _points) oraclized {
+    function __setIssuePoints(uint256 _projectId, uint256 _issueId, uint256[] _userId, uint256[] _points) oraclized {
         GitRepositoryI repo = GitRepositoryI(repositoryReg.getAddr(_projectId));
-        repo.setBountyPoints(_issueId, userReg.getAddr(_userId), _points);
+        uint len = _userId.length;
+		for(uint i = 0; i < len; i++){
+		    address addr = userReg.getAddr(_userId[i]);
+		    repo.setBountyPoints(_issueId, addr, _points[i]);
+		}
     }
 
-    event NewPoints(uint repoId, uint userId, uint total, bool claimed);
-
-    function __newPoints(uint _repoId, uint _userId, uint _points)
-     oraclized {
-		GitRepositoryI repoaddr = GitRepositoryI(repositoryReg.getAddr(_repoId));
-        bool claimed = repoaddr.claim(userReg.getAddr(_userId), _points);
-		if(!claimed){ //try to claim points
-		    pending[_userId][_repoId] += _points; //set as a pending points
+    function __newPoints(uint _repoId, uint[] _userIds, uint[] _points) oraclized {
+		GitRepositoryI repo = GitRepositoryI(repositoryReg.getAddr(_repoId));
+		uint len = _userIds.length;
+		for(uint i = 0; i < len; i++){
+		    uint _userId = _userIds[i];
+		    uint _uPoints = _points[i];
+		    address addr = userReg.getAddr(_userId);
+		    if(addr == 0x0 || !repo.claim(addr, _uPoints)){
+		        pending[_userId][_repoId] += _uPoints;        
+		    }
 		}
-        NewPoints(_repoId, _userId, _points, claimed); 
     }
     
     //claims pending points
@@ -113,9 +131,7 @@ contract GitHubOracle is Controlled, DGitI {
         GitRepositoryI repoaddr = GitRepositoryI(repositoryReg.getAddr(_repoId));
         uint total = pending[_userId][_repoId];
         delete pending[_userId][_repoId];
-        if(repoaddr.claim(userReg.getAddr(_userId), total)) {
-            NewPoints(_repoId,_userId,total,true);
-        } else throw;
+        if(!repoaddr.claim(userReg.getAddr(_userId), total)) throw;
     }
         
 }
