@@ -31,14 +31,14 @@ contract GitHubPoints is Controlled, usingOraclize{
         bytes20 commitid;
     }
     
-    function start(string _repository, string _branch, string _cred) payable only_owner {
+    function start(string _repository, string _branch, string _cred) payable onlyController {
         if(bytes(_cred).length == 0) _cred = cred; 
         bytes32 ocid = oraclize_query("nested", _query_start(_repository,_branch,_cred));
         command[ocid] = Command.START;
         branches[ocid] = _branch;
     }
     
-    function update(string _repository, string _branch, string _lastCommit, string _cred) payable only_owner {
+    function update(string _repository, string _branch, string _lastCommit, string _cred) payable onlyController {
         if(bytes(_cred).length == 0) _cred = cred; 
         bytes32 ocid = oraclize_query("nested", _query_update(_repository,_branch,_lastCommit,_cred));
         command[ocid] = Command.UPDATE;
@@ -47,7 +47,7 @@ contract GitHubPoints is Controlled, usingOraclize{
     }
     
     function resume(string _repository, string _branch, string _lastCommit, string _limitCommit, string _cred)
-     payable only_owner {
+     payable onlyController {
         if(bytes(_cred).length == 0) _cred = cred; 
         bytes32 ocid = oraclize_query("nested", _query_resume(_repository,_branch,_lastCommit,_limitCommit,_cred));
         command[ocid] = Command.RESUME;
@@ -56,7 +56,7 @@ contract GitHubPoints is Controlled, usingOraclize{
     }
     
     function issue(string _repository, string _issue, string _cred)
-     payable only_owner {
+     payable onlyController {
         if(bytes(_cred).length == 0) _cred = cred; 
         command[ocid] = Command.ISSUE;
         bytes32 ocid = oraclize_query("nested", _query_issue(_repository,_issue,_cred));
@@ -197,15 +197,15 @@ contract GitHubPoints is Controlled, usingOraclize{
         oraclize_setProof(proofType_TLSNotary | proofStorage_IPFS);
     }
     
-    function setAPICredentials(string _client_id_comma_client_secret) only_owner {
+    function setAPICredentials(string _client_id_comma_client_secret) onlyController {
          cred = _client_id_comma_client_secret;
     }
     
-    function setScript(string _script) only_owner{
+    function setScript(string _script) onlyController{
         script = _script;
     }
 
-    function clearAPICredentials() only_owner {
+    function clearAPICredentials() onlyController {
          cred = "";
      }
 

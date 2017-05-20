@@ -52,7 +52,7 @@ contract GitRepository is GitRepositoryI {
     
     //oracle claim request
     function claim(address _user, uint _total) 
-     only_owner returns (bool) {
+     onlyController returns (bool) {
         if(!token.lock() && _user != 0x0){
             token.mint(_user, _total);
             return true;
@@ -61,12 +61,12 @@ contract GitRepository is GitRepositoryI {
         }
     }
     
-    function setBounty(uint256 _issueId, bool _state, uint256 _closedAt) only_owner {
+    function setBounty(uint256 _issueId, bool _state, uint256 _closedAt) onlyController {
         if (_state) bountyBank.open(_issueId);
         else bountyBank.close(_issueId,_closedAt);
     }
     
-    function setBountyPoints(uint256 _issueId, address _claimer, uint256 _points) only_owner {
+    function setBountyPoints(uint256 _issueId, address _claimer, uint256 _points) onlyController {
         bountyBank.setClaimer(_issueId,_claimer,_points);
     }   
 

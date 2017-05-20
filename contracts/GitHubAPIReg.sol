@@ -22,7 +22,7 @@ contract GitHubAPIReg is Controlled, usingOraclize {
     }
 
     //owner management
-    function setAPICredentials(string _client_id, string _client_secret) only_owner {
+    function setAPICredentials(string _client_id, string _client_secret) onlyController {
         strings.slice [] memory cm = new strings.slice[](5);
         cm[0] = strings.toSlice("?client_id=");
         cm[1] = _client_id.toSlice();
@@ -31,7 +31,7 @@ contract GitHubAPIReg is Controlled, usingOraclize {
         cred = strings.toSlice("").join(cm);        
     }
     
-    function clearAPICredentials() only_owner {
+    function clearAPICredentials() onlyController {
          cred = "";
     }
 

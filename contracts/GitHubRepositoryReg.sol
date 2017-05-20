@@ -69,8 +69,8 @@ contract GitHubRepositoryReg is NameRegistry, GitHubAPIReg {
         (default_branch,pos) = getNextString(v,pos);
         address repoAddr = repositories[projectId].addr;
         if(repoAddr == 0x0){   
-            GitRepositoryI repo = GitFactory.newGitRepository(projectId, full_name);
-            repo.setOwner(owner);
+            GitReposcitoryI repo = GitFactory.newGitRepository(projectId, full_name);
+            repo.changeController(controller);
             repoAddr = address(repo);
             indexes[sha3(repoAddr)] = projectId; 
             indexes[sha3(full_name)] = projectId;

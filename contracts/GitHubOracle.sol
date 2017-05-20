@@ -41,7 +41,7 @@ contract GitHubOracle is Controlled, DGitI {
         mapping (string => string) pending;
     }
     
-    function __init_regs() only_owner {
+    function __init_regs() onlyController {
         if(address(userReg) == 0x0){
             userReg = GHUserReg.create();
         }
@@ -50,7 +50,7 @@ contract GitHubOracle is Controlled, DGitI {
         }
     }
 
-    function __set_points_script(string _arg) only_owner {
+    function __set_points_script(string _arg) onlyController {
         if(address(gitHubPoints) == 0x0){
             gitHubPoints = GHPoints.create(_arg);
         }else {
@@ -58,10 +58,10 @@ contract GitHubOracle is Controlled, DGitI {
         }
     }
     
-    function __setController(address __newcontroller) only_owner {
-        userReg.setOwner(newContract);
-        repoReg.setOwner(newContract);
-        gitHubPoints.setOwner(newContract);
+    function __changeController(address _newController) onlyController {
+        userReg.changeController(_newController);
+        repoReg.changeController(newContract);
+        gitHubPoints.changeController(newContract);
     }
 
     function update(string _repository, string _token) payable {
@@ -99,7 +99,7 @@ contract GitHubOracle is Controlled, DGitI {
     event NewPoints(uint repoId, uint userId, uint total, bool claimed);
 
     function __newPoints(uint _repoId, uint _userId, uint _points)
-     only_owner {
+     oraclized {
 		GitRepositoryI repoaddr = GitRepositoryI(repositoryReg.getAddr(_repoId));
         bool claimed = repoaddr.claim(userReg.getAddr(_userId), _points);
 		if(!claimed){ //try to claim points

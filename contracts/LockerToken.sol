@@ -14,13 +14,13 @@ pragma solidity ^0.4.11;
 contract LockerToken is AbstractToken, Lockable, Controlled {
     Lockable public locker = this;
 
-    function unlinkLocker() only_owner {
+    function unlinkLocker() onlyController {
         locker = this;
     }
-    function linkLocker(Lockable _locker) only_owner {
+    function linkLocker(Lockable _locker) onlyController {
         locker = _locker;
     }
-    function setlock(bool _lock) only_owner {
+    function setlock(bool _lock) onlyController {
         setLock(_lock);
     }
     

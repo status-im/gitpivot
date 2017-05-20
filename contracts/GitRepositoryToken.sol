@@ -27,7 +27,7 @@ contract GitRepositoryToken is LockerToken {
     }
     
     function mint(address _who, uint256 _value)
-     only_owner when_locked(false) {
+     onlyController when_locked(false) {
         _mint(_who,_value);
     }
 
