@@ -2,13 +2,23 @@
 import sys
 import os
 import json
+import urllib
 import urllib2
-import datetime
+from datetime import datetime
+import re
+ 
 from collections import defaultdict
 
+
+
+startTime = datetime.now()
 def logmsg(msg):
     """Logs a message into proof."""
-    sys.stderr.write("[GitHubOracle] "+msg+" \n")
+    global startTime
+    msg = str(datetime.now() - startTime)[:10] + " [GitHubOracle] "+msg+" \n"
+    sys.stderr.write(msg)
+logmsg(str(startTime))
+
 
 class GitHubAPI:
     """Authentication and API Requests."""
@@ -31,28 +41,26 @@ class GitHubAPI:
             logmsg(rjs['error_uri'])
             sys.exit("403 Forbidden")
 
-    def __init__(self):
-        self.argn = int(os.environ['ARGN'])
-        if self.argn > 2:
-            autharg = [x.strip() for x in os.environ['ARG2'].split(',')]
-            if len(autharg) == 3: #is token
-                logmsg("Using OAuth")
-                self.client = autharg[0]
-                self.secret = autharg[1]
-                self.token = self.oauth(autharg[2])
-                self.auth = 2
-            elif len(autharg) == 2: #is secret
-                logmsg("Using Secret Mode")
-                self.client = autharg[0]
-                self.secret = autharg[1]
-                self.auth = 1
-            elif len(autharg) == 1 and len(autharg[0]) > 0:
-                logmsg("Using Token")
-                self.token = autharg[0]
-                self.auth = 2
-            else:
-                logmsg("Anonymous API")
-                self.auth = 0
+    def __init__(self, auth):
+        autharg = [x.strip() for x in auth.split(',')]
+        if len(autharg) == 3: #is token
+            logmsg("Using OAuth")
+            self.client = autharg[0]
+            self.secret = autharg[1]
+            self.token = self.oauth(autharg[2])
+            self.auth = 2
+        elif len(autharg) == 2: #is secret
+            logmsg("Using Secret Mode")
+            self.client = autharg[0]
+            self.secret = autharg[1]
+            self.auth = 1
+        elif len(autharg) == 1 and len(autharg[0]) > 0:
+            logmsg("Using Token")
+            self.token = autharg[0]
+            self.auth = 2
+        else:
+            logmsg("Anonymous API")
+            self.auth = 0
         api_link = "https://api.github.com/rate_limit"
         if self.auth == 1:
             req = urllib2.Request(api_link+"?client_id="+self.client+"&client_secret="+self.secret)
@@ -66,6 +74,7 @@ class GitHubAPI:
         self.api['rate_limit'] = int(res['rate']['limit'])
         self.api['rate_remaining'] = int(res['rate']['remaining'])
         self.api['rate_reset'] = int(res['rate']['reset'])
+        logmsg("API calls remaining: "+ str(self.api['rate_remaining']))
 
     def check_limit(self, more_than=0):
         """Returns True if under limit, else log and return False."""
@@ -75,24 +84,27 @@ class GitHubAPI:
             logmsg("X-RateLimit reached. Try again in "+self.api['rate_reset']+".")
             return False
 
-    def request(self, api_link, arguments_get=None, arguments_post=None):
+    def request(self, api_link, arguments_get=None, arguments_post=None, headers=None):
         """Request something to API using authentication."""
         if arguments_get is None:
             arguments_get = []
         if self.auth == 1:
             arguments_get += [["client_id", self.client], ["client_secret", self.secret]]
         if self.auth == 2:
-            arguments_post += [["Access-Token", self.token]]
+            headers += [["Access-Token", self.token]]
         if len(arguments_get) > 0:
             api_link += "?"
             for argument in arguments_get:
                 api_link += argument[0]+"="+argument[1]+"&"
             api_link = api_link[0:-1]
         req = urllib2.Request(api_link)
-        if arguments_post is not None and len(arguments_post) > 0:
-            for argument in arguments_post:
-                req.add_header(argument[0], argument[1])
-        response = urllib2.urlopen(req)
+        if headers is not None and len(headers) > 0:
+            for header in headers:
+                req.add_header(header[0], header[1])
+        if arguments_post is None:
+            response = urllib2.urlopen(req)
+        else:
+            response = urllib2.urlopen(req, urllib.urlencode(arguments_post))
         self.api['rate_limit'] = int(response.headers.get("X-RateLimit-Limit"))
         self.api['rate_remaining'] = int(response.headers.get("X-RateLimit-Remaining"))
         self.api['rate_reset'] = int(response.headers.get("X-RateLimit-Reset"))
@@ -105,9 +117,11 @@ class GitRepository:
     tail = ""
     repo_link = ""
     points = defaultdict(int)
+    config = defaultdict(str)
     count = 0
+    api = None
 
-    def __init__(self, api, repository, name=True):
+    def __init__(self, api, repository, branch=None, name=True):
         self.api = api
         if name:
             self.repo_link = "https://api.github.com/repos/"
@@ -115,7 +129,25 @@ class GitRepository:
             self.repo_link = "https://api.github.com/repositories/"
         self.repo_link += repository
         self.data = json.load(api.request(self.repo_link))
-        self.branch_name = self.data['default_branch']
+        if branch != None:
+            self.branch_name = branch
+        else:    
+            self.branch_name = self.data['default_branch']
+        self._load_config()
+        if self.config['user-agent'] != '*' and self.config['user-agent'] != 'githuboracle':
+            sys.exit("403 Forbidden")
+
+    def _load_config(self):    
+        config_file = "https://raw.githubusercontent.com/"+self.data['full_name']+"/"+self.branch_name+"/.gitrobots"
+        req = urllib2.Request(config_file)
+        try:
+            response = urllib2.urlopen(req).read().lower()
+            for line in response.splitlines():
+                logmsg("Rule loaded "+line)
+                param = line.split(':')
+                self.config[param[0].strip()] = param[1].strip()
+        except urllib2.HTTPError:
+            logmsg("No .gitrobots in branch root")
 
     def set_branch(self, branch_name):
         """Sets the working branch."""
@@ -135,7 +167,7 @@ class GitRepository:
         logmsg("Loaded branch " + self.branch_name)
         if self.branch is None:
             branches_link = self.repo_link + "/branches/" + self.branch_name
-            self.branch = json.load(api.request(branches_link))
+            self.branch = json.load(self.api.request(branches_link))
         return self.branch
 
     def __parse_link_header(self, headers):
@@ -180,7 +212,7 @@ class GitRepository:
         return self.tail
 
     def continue_loading(self, old_tail, limit=""):
-        logmsg("Continuing from "+self.head+ (" up to "+limit if len(limit) > 0 else "") +".")
+        logmsg("Continuing from "+old_tail+ (" up to "+limit if len(limit) > 0 else "") +".")
         page = '1'
         claim = False
         while self.api.check_limit():
@@ -214,13 +246,7 @@ class GitRepository:
         self.count += 1
         if len(commit['parents']) < 2 and commit['author'] is not None:
             commit = json.load(self.api.request(commit['url']))
-            author = commit['author']['id']
-            self.points[author] += int(commit['stats']['additions'])
-            if len(commit['parents']) == 0:
-                parent = "<seed>"
-            else:
-                parent = "<"+commit['parents'][0]['sha']+">"
-            logmsg(commit['sha']+": "+  commit['author']['login'] + " ("+str(author) + ") +" + str(commit['stats']['additions']) + " -"+ str(commit['stats']['deletions']) + " |= " + str(commit['stats']['total']) + " " + parent)
+            self.compute_points(commit)
         else:
             if len(commit['parents']) >= 2:
                 parents = ""
@@ -235,7 +261,7 @@ class GitRepository:
 
     def issue_points(self, issueid):
         link_issue = self.repo_link + "/issues/" + issueid
-        issue = json.load(api.request(link_issue))
+        issue = json.load(self.api.request(link_issue))
         link_issue = self.repo_link + "/issues/" + issueid + "/timeline"
         issue_timeline = self.api.request(link_issue, None, ["Accept", "application/vnd.github.mockingbird-preview"])
         for elem in issue_timeline:
@@ -247,89 +273,122 @@ class GitRepository:
                     pull = json.load(self.api.request(link_pull))
                     if pull['merged_at']:
                         link_pulls_commits = self.repo_link + "/pulls/" + pr + "/commits"
-                        commits = json.load(api.request(link_pulls_commits))
+                        commits = json.load(self.api.request(link_pulls_commits))
                         for commit in commits:
                             if commit['url']:
                                 _commit = json.load(self.api.request(commit['url']))
-                                author = _commit['author']['login']
-                                self.points[author] += int(json.dumps(_commit['stats']['total']))
+                                self.compute_points(_commit)
         return issue
+        
+    def compute_points(self, _commit):
+        author = _commit['author']['id']
+        points = 0
+        rewards = self.config['reward-mode'].split(',')
+        for reward in rewards:
+            if reward == 'lines':
+                points += int(_commit['stats']['additions'])
+            elif reward == "words":
+                points += self._compute_words(_commit)
+        if points > 0:
+            self.points[author] += points
+        logmsg(_commit['sha']+": "+  _commit['author']['login'] + " +" + str(points))
 
-def user_register(github_user,gistid):
-    logmsg("Reading Gist "+gistid+" from "+github_user+".")
-    value = json.load(api.request("https://api.github.com/gists/" + gistid))
-    login = value['owner']['login']
-    logmsg("Gist owner is "+login+".")
-    if login == github_user:
-        content = urllib2.urlopen("https://gist.githubusercontent.com/" + github_user + "/" + gistid + "/raw/").read(42)
-        logmsg("Address is " + content)
-        print "["+json.dumps(content)+",",
-        print json.dumps(value['owner']['id'])+", "+json.dumps(login)+"]"
-    else:
-        logmsg("Wrong condition: "+github_user+" != "+login)
-        sys.exit("403 Forbidden")
-
-
+    def _compute_words(self, _commit):
+        pattern = re.compile('[\W_]+')
+        points = 0
+        for _file in _commit['files']:
+            if _file['additions'] > 0:
+                try:
+                    for line in _file['patch'].splitlines():
+                        if line[0] == '+':
+                            points += len(filter(None, pattern.sub(' ', line).split(' ')))
+                except KeyError:
+                    if self.config['compute-bigfiles'] == "yes" and _file['status'] == 'added':
+                        req = urllib2.Request(_file['raw_url'])
+                        response = urllib2.urlopen(req).read()
+                        for line in response.splitlines():
+                            points += len(filter(None, pattern.sub(' ', line).split(' ')))
+                    else:
+                        logmsg(_commit['sha']+": " + _file['sha'] + " file too big")
+        return points
 
 #Script start
-try:
+try:    
     argn = int(os.environ['ARGN'])
 except KeyError:
     sys.exit("400 Error") #bad call
-if argn < 2:
-    sys.exit("404 Error") #no default function
-if argn > 3:
-    sys.exit("400 Error") #bad call
 
-logmsg("Started " + os.environ['ARG0'] + "(" +  os.environ['ARG1']+")")
+try:
+    script = os.environ['ARG0']
+    args = os.environ['ARG1']
+except KeyError:
+    sys.exit("404 Error") #bad call
 
-script = os.environ['ARG0']
-args = [x.strip() for x in os.environ['ARG1'].split(',')]
-api = GitHubAPI()
+try:
+    api_auth = os.environ['ARG2']
+except KeyError:
+    api_auth = ""
 
-if api.check_limit(5):
-    if script == 'update-new':
-        repository = GitRepository(api, args[0])
-        if len(args) > 1:
-            repository.set_branch(args[1])
-        if len(args) > 2:
-            repository.set_head(args[2])
-        repository.update_commits()
-        print "["+json.dumps(repository.data['id'])+"," + json.dumps(repository.branch['name']) + ",",
-        print json.dumps(repository.head) + "," + json.dumps(repository.tail) + ",",
-        print str(len(repository.points)) + ",",
-        print json.dumps(repository.points.items()),
-        print "]"
-    elif script == 'update-old':
-        repository = GitRepository(api, args[0])
+try:
+    settings = os.environ['ARG3']
+except KeyError:
+    settings = ""
+
+out = ""
+logmsg("Started '" + script + " "+ args)
+myApi = GitHubAPI(api_auth)
+args = [x.strip() for x in args.split(',')]
+try:
+    branch = args[1];
+except KeyError:
+    branch = None
+if myApi.check_limit(5):
+    repository = GitRepository(myApi, args[0], branch)
+    if script == 'update':
         repository.set_branch(args[1])
         repository.set_head(args[2])
-        try:
-            repository.continue_loading(args[3], args[4])
-        except IndexError:
-            repository.continue_loading(args[3])
-        print "["+json.dumps(repository.data['id'])+"," + json.dumps(repository.get_branch()['name']) + ",",
-        print json.dumps(repository.head) + "," + json.dumps(repository.tail) + ",",
-        print str(len(repository.points)) + ",",
-        print json.dumps(repository.points.items()),
-        print "]"
-    elif script == 'repository-add':
-        repository = GitRepository(api, args[0])
-        print "["+json.dumps(repository.data['id'])+",",
-        print json.dumps(repository.data['full_name'])+",",
-        print json.dumps(repository.data['watchers_count'])+",",
-        print json.dumps(repository.data['stargazers_count'])+"]"
-    elif script == "user-add":
-        user_register(args[0], args[1])
-    elif script == "issue-update":
-        repository = GitRepository(api, args[0])
-        issue = repository.issue_points(args[1])
-        print "["+json.dumps(repository.data['id'])+"," + json.dumps(issue['id']),
-        print json.dumps(issue['state']) + ", " + datetime.datetime.strptime(issue['closed_at'], "%Y-%m-%dT%H:%M:%SZ").strftime('%s') + ", ",
-        print str(len(repository.points)) + ",",
-        print json.dumps(repository.points.items()),
-        print "]"
+        repository.update_commits()
+        out += "["+json.dumps(repository.data['id'])+"," + json.dumps(repository.branch['name']) + ","
+        out += json.dumps(repository.head) + "," + json.dumps(repository.tail) + ","
+        out += str(len(repository.points)) + ","
+        out += json.dumps(repository.points.items())
+        out += "]"
+    elif script == 'start':
+        repository.set_branch(args[1])
+        repository.update_commits()
+        out += "["+json.dumps(repository.data['id'])+"," + json.dumps(repository.branch['name']) + ","
+        out += json.dumps(repository.head) + "," + json.dumps(repository.tail) + ","
+        out += str(len(repository.points)) + ","
+        out += json.dumps(repository.points.items())
+        out += "]"
+    elif script == 'rtail':
+        repository.set_branch(args[1])
+        newTail = repository.continue_loading(args[2])
+        out += "["+json.dumps(repository.data['id'])+"," + json.dumps(repository.get_branch()['name']) + ","
+        out += json.dumps(newTail) + ","
+        out += str(len(repository.points)) + ","
+        out += json.dumps(repository.points.items())
+        out += "]"
+    elif script == 'resume':
+        repository.set_branch(args[1])
+        newTail = repository.continue_loading(args[2],args[3])
+        out += "["+json.dumps(repository.data['id'])+"," + json.dumps(repository.get_branch()['name']) + ","
+        out += json.dumps(newTail) + ","
+        out += str(len(repository.points)) + ","
+        out += json.dumps(repository.points.items())
+        out += "]"
+    elif script == "issue":
+        issueid = args[1];
+        issue = repository.issue_points(issueid)
+        out += "["+json.dumps(repository.data['id'])+"," + json.dumps(issue['id'])
+        out += json.dumps(issue['state']) + ", " + datetime.strptime(issue['closed_at'], "%Y-%m-%dT%H:%M:%SZ").strftime('%s') + ", "
+        out += str(len(repository.points)) + ","
+        out += json.dumps(repository.points.items())
+        out += "]"
     else:
         sys.exit("501 Not implemented")
 else:
     sys.exit("503 Service Unavailable")
+
+
+print out;
