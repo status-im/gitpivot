@@ -21,7 +21,7 @@ contract GitHubPoints is Controlled, usingOraclize{
     string private cred = ""; 
     string private script = "";
     
-    enum Command { ISSUE, START, UPDATE, RESUME, LONGTAIL }
+    enum Command { ISSUE, START, UPDATE, RESUME, RTAIL }
     mapping (bytes32 => Claim) claim; // temporary db 
     struct Claim {
         Command command;
@@ -41,11 +41,11 @@ contract GitHubPoints is Controlled, usingOraclize{
         claim[ocid] = Claim({command: Command.UPDATE, branch: _branch, lastCommit: _lastCommit});
     }
     
-    function longtail(string _repository, string _branch, string _claimedTail, string _cred)
+    function rtail(string _repository, string _branch, string _claimedTail, string _cred)
      payable onlyController {
         if(bytes(_cred).length == 0) _cred = cred; 
-        bytes32 ocid = oraclize_query("nested", _query_longtail(_repository,_branch,_claimedTail,_cred));
-        claim[ocid] = Claim({command: Command.LONGTAIL, branch: _branch, lastCommit: ""});
+        bytes32 ocid = oraclize_query("nested", _query_rtail(_repository,_branch,_claimedTail,_cred));
+        claim[ocid] = Claim({command: Command.RTAIL, branch: _branch, lastCommit: ""});
     }
     
     function resume(string _repository, string _branch, string _pendingTail, string _claimedCommit, string _cred)
@@ -94,7 +94,7 @@ contract GitHubPoints is Controlled, usingOraclize{
                 dGit.__setHead(projectId,temp); 
             }
             (temp,pos) = getNextString(v,pos); //temp = scan tail
-            if(claim.command == Command.START || claim.command == Command.LONGTAIL){
+            if(claim.command == Command.START || claim.command == Command.RTAIL){
                 dGit.__setTail(projectId,temp);   
             }
             if((claim.command == Command.RESUME || claim.command == Command.UPDATE) && sha3(claim.lastCommit) != sha3(temp)){
@@ -176,13 +176,13 @@ contract GitHubPoints is Controlled, usingOraclize{
        return _query_script("resume",comma.join(cm),_cred);
     }
     
-    function _query_longtail(string _repository, string _branch, string _claimedTail, string _cred) internal constant returns (string){
+    function _query_rtail(string _repository, string _branch, string _claimedTail, string _cred) internal constant returns (string){
        strings.slice memory comma = strings.toSlice(",");
        strings.slice [] memory cm = new strings.slice[](3);
        cm[0] = _repository.toSlice();
        cm[1] = _branch.toSlice();
        cm[2] = _claimedTail.toSlice();
-       return _query_script("longtail",comma.join(cm),_cred);
+       return _query_script("rtail",comma.join(cm),_cred);
     }
 
     function _query_issue(string _repository, string _issue, string _cred) internal returns(string){

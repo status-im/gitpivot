@@ -77,11 +77,11 @@ contract GitHubOracle is Controlled, DGitI {
         gitHubPoints.resume.value(msg.value)(_repository, _branch, _pendingTail, claimedCommit, _token);
     }
 
-    function longtail(string _repository, string _branch, string _token) payable {
+    function rtail(string _repository, string _branch, string _token) payable {
         uint256 repoId = repositoryReg.getId(_repository);
         if(repoId == 0) throw;
         if(repositoryReg.getBranch(repoId) != sha3(_branch)) throw;
-        gitHubPoints.longtail.value(msg.value)(_repository, _branch, repositories[repoId].tail, _token);
+        gitHubPoints.rtail.value(msg.value)(_repository, _branch, repositories[repoId].tail, _token);
     }
     
     function issue(string _repository, string _issue, string _token) payable {
