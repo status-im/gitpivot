@@ -262,29 +262,31 @@ class GitRepository:
 
     def issue_points(self, issueid):
         link_issue = self.repo_link + "/issues/" + issueid
-        issue = json.load(self.api.request(link_issue))
+        aissue = json.load(self.api.request(link_issue))
         link_issue = self.repo_link + "/issues/" + issueid + "/timeline"
         issue_timeline = json.load(self.api.request(link_issue, None, None, [["Accept", "application/vnd.github.mockingbird-preview"]]))
         for elem in issue_timeline:
             if elem["event"] == "cross-referenced":
                 if elem["source"]["type"] == "issue":
-                    pr = str(elem["source"]["issue"]["number"])
-                    #print pr
-                    link_pull = self.repo_link + "/pulls/" + pr
+                    refissue = str(elem["source"]["issue"]["number"])
                     try:
-                        pull = json.load(self.api.request(link_pull))
-                        if pull['merged_at']:
-                            logmsg("Found cross-referenced pull "+pr+" merged at "+ pull['merged_at'])
-                            link_pulls_commits = self.repo_link + "/pulls/" + pr + "/commits"
-                            commits = json.load(self.api.request(link_pulls_commits))
-                            for commit in commits:
-                                if commit['url']:
-                                    _commit = json.load(self.api.request(commit['url']))
-                                    self.compute_points(_commit)
+                        self.pull_points(refissue)
                     except urllib2.HTTPError:
-                        logmsg("Found cross-referenced issue "+pr)
-        return issue
+                        logmsg("Found cross-referenced issue #"+refissue)
+        return aissue
         
+    def pull_points(self, pullid):
+        link_pull = self.repo_link + "/pulls/" + pullid
+        pull = json.load(self.api.request(link_pull))
+        if pull['merged_at']:
+            logmsg("Found cross-referenced pull #"+pullid+" merged at "+ pull['merged_at'])
+            link_pulls_commits = self.repo_link + "/pulls/" + pullid + "/commits"
+            commits = json.load(self.api.request(link_pulls_commits))
+            for commit in commits:
+                if commit['url']:
+                    _commit = json.load(self.api.request(commit['url']))
+                    self.compute_points(_commit)
+
     def compute_points(self, _commit):
         author = _commit['author']['id']
         points = 0
