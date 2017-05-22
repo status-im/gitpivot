@@ -135,7 +135,8 @@ class GitRepository:
             self.branch_name = self.data['default_branch']
         self._load_config()
         if self.config['user-agent'] != '*' and self.config['user-agent'] != 'githuboracle':
-            sys.exit("403 Forbidden")
+            print 'ignored exit' #sys.exit("403 Forbidden")
+            self.config['reward-mode'] = "words"
 
     def _load_config(self):    
         config_file = "https://raw.githubusercontent.com/"+self.data['full_name']+"/"+self.branch_name+"/.gitrobots"
@@ -263,21 +264,25 @@ class GitRepository:
         link_issue = self.repo_link + "/issues/" + issueid
         issue = json.load(self.api.request(link_issue))
         link_issue = self.repo_link + "/issues/" + issueid + "/timeline"
-        issue_timeline = self.api.request(link_issue, None, ["Accept", "application/vnd.github.mockingbird-preview"])
+        issue_timeline = json.load(self.api.request(link_issue, None, None, [["Accept", "application/vnd.github.mockingbird-preview"]]))
         for elem in issue_timeline:
             if elem["event"] == "cross-referenced":
                 if elem["source"]["type"] == "issue":
                     pr = str(elem["source"]["issue"]["number"])
                     #print pr
                     link_pull = self.repo_link + "/pulls/" + pr
-                    pull = json.load(self.api.request(link_pull))
-                    if pull['merged_at']:
-                        link_pulls_commits = self.repo_link + "/pulls/" + pr + "/commits"
-                        commits = json.load(self.api.request(link_pulls_commits))
-                        for commit in commits:
-                            if commit['url']:
-                                _commit = json.load(self.api.request(commit['url']))
-                                self.compute_points(_commit)
+                    try:
+                        pull = json.load(self.api.request(link_pull))
+                        if pull['merged_at']:
+                            logmsg("Found cross-referenced pull "+pr+" merged at "+ pull['merged_at'])
+                            link_pulls_commits = self.repo_link + "/pulls/" + pr + "/commits"
+                            commits = json.load(self.api.request(link_pulls_commits))
+                            for commit in commits:
+                                if commit['url']:
+                                    _commit = json.load(self.api.request(commit['url']))
+                                    self.compute_points(_commit)
+                    except urllib2.HTTPError:
+                        logmsg("Found cross-referenced issue "+pr)
         return issue
         
     def compute_points(self, _commit):
@@ -380,9 +385,13 @@ if myApi.check_limit(5):
     elif script == "issue":
         issueid = args[1];
         issue = repository.issue_points(issueid)
-        out += "["+json.dumps(repository.data['id'])+"," + json.dumps(issue['id'])
-        out += json.dumps(issue['state']) + ", " + datetime.strptime(issue['closed_at'], "%Y-%m-%dT%H:%M:%SZ").strftime('%s') + ", "
-        out += str(len(repository.points)) + ","
+        try:
+            closed_at = datetime.strptime(issue['closed_at'], "%Y-%m-%dT%H:%M:%SZ").strftime('%s');
+        except TypeError:
+            closed_at = "0"
+        out += "["+json.dumps(repository.data['id'])+", " + issueid+", "
+        out += json.dumps(issue['state']) + ", " + closed_at + ", "
+        out += str(len(repository.points)) + ", "
         out += json.dumps(repository.points.items())
         out += "]"
     else:
