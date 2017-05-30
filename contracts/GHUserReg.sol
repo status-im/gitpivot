@@ -3,9 +3,9 @@
  * Registers GitHub user login to an address
  * Ricardo Guilherme Schmidt <3esmit@gmail.com>
  */
-import "GitHubAPIReg.sol";
-import "NameRegistry.sol";
-import "strings.sol";
+import "./GitHubAPIReg.sol";
+import "./management/NameRegistry.sol";
+import "./helpers/strings.sol";
 
 pragma solidity ^0.4.11;
 

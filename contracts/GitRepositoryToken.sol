@@ -13,17 +13,14 @@
  * Released under GPLv3 License
  */
 
-import "LockerToken.sol";
-import "Controlled.sol";
+import "./token/LockerToken.sol";
+import "./management/Controlled.sol";
 
 pragma solidity ^0.4.11;
 
 contract GitRepositoryToken is LockerToken {
 
-    function GitRepositoryToken(string _repository) {
-        setAttribute("name", _repository);
-        setAttribute("symbol", "GIT");
-        setDecimalBase(0);
+    function GitRepositoryToken(string _repository) AbstractToken(0, _repository, "GIT"){
     }
     
     function mint(address _who, uint256 _value)

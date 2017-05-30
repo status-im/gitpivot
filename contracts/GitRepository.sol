@@ -13,10 +13,10 @@
  * Released under GPLv3 License
  */
  
-import "CollaborationBank.sol";
-import "Controlled.sol";
-import "./BountyBank.sol";
-import "./GitRepositoryToken.sol";
+//import "./bank/CollaborationBank.sol";
+import "./management/Controlled.sol";
+import "./bank/BountyBank.sol";
+//import "./GitRepositoryToken.sol";
 
 pragma solidity ^0.4.11;
 
@@ -28,8 +28,8 @@ contract GitRepositoryI is Controlled{
 
 contract GitRepository is GitRepositoryI {
 
-    GitRepositoryToken public token;
-    CollaborationBank public donationBank;
+    //GitRepositoryToken public token;
+ //   CollaborationBank public donationBank;
     BountyBank public bountyBank;
     mapping (address=>uint) donators;
 
@@ -37,28 +37,28 @@ contract GitRepository is GitRepositoryI {
     uint256 public uid;
 
     function () payable {
-        donationBank.deposit();
+    //    donationBank.deposit();
         donators[msg.sender] += msg.value;
     }
 
     function GitRepository(uint256 _uid, string _name) {
        uid = _uid;
        name = _name;
-       token = new GitRepositoryToken(_name);
-       donationBank = new CollaborationBank(token);
-       token.linkLocker(donationBank);
+       //token = new GitRepositoryToken(_name);
+ //      donationBank = new CollaborationBank(token);
+   //    token.linkLocker(donationBank);
        bountyBank = new BountyBank();
     }
     
     //oracle claim request
     function claim(address _user, uint _total) 
      onlyController returns (bool) {
-        if(!token.lock() && _user != 0x0){
-            token.mint(_user, _total);
-            return true;
-        }else{
+  //      if(!token.lock() && _user != 0x0){
+ //           token.mint(_user, _total);
+//            return true;
+  //      }else{
             return false;
-        }
+   //     }
     }
     
     function setBounty(uint256 _issueId, bool _state, uint256 _closedAt) onlyController {
@@ -69,14 +69,5 @@ contract GitRepository is GitRepositoryI {
     function setBountyPoints(uint256 _issueId, address _claimer, uint256 _points) onlyController {
         bountyBank.setClaimer(_issueId,_claimer,_points);
     }   
-
-}
-
-library GitFactory {
-
-    function newGitRepository(uint256 _uid, string _name) returns (GitRepositoryI){
-        GitRepository repo = new GitRepository(_uid,_name);
-        return repo;
-    }
 
 }

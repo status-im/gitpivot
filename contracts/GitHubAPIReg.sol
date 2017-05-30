@@ -3,9 +3,9 @@
  * Abstract Logic for GitHubOracle Registries.
  * Ricardo Guilherme Schmidt <3esmit@gmail.com>
  */
-import "Controlled.sol";
-import "oraclizeAPI_0.4.sol";
-import "strings.sol";
+import "./management/Controlled.sol";
+import "./oraclize/oraclizeAPI_0.4.sol";
+import "./helpers/strings.sol";
 
 pragma solidity ^0.4.11;
 

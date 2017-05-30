@@ -75,7 +75,7 @@ contract usingOraclize {
         _;
     }
 
-    function oraclize_setNetwork(uint8 networkID) internal returns(bool){
+    function oraclize_setNetwork(uint8) internal returns(bool){
         if (getCodeSize(0x1d3B2638a7cC9f2CB3D298A3DA7a90B67E5506ed)>0){ //mainnet
             OAR = OraclizeAddrResolverI(0x1d3B2638a7cC9f2CB3D298A3DA7a90B67E5506ed);
             return true;
@@ -106,7 +106,7 @@ contract usingOraclize {
     function __callback(bytes32 myid, string result) {
         __callback(myid, result, new bytes(0));
     }
-    function __callback(bytes32 myid, string result, bytes proof) {
+    function __callback(bytes32, string, bytes) {
     }
 
     function oraclize_getPrice(string datasource) oraclizeAPI internal returns (uint){

@@ -13,11 +13,10 @@
  * Released under GPLv3 License
  */
  
-import "oraclizeAPI_0.4.sol";
-import "Controlled.sol";
-import "./GitHubUserReg.sol";
-import "./GitHubRepositoryReg.sol";
-import "./GitHubPoints.sol";
+import "./management/Controlled.sol";
+import "./GHUserReg.sol";
+import "./GHRepoReg.sol";
+import "./GHPoints.sol";
 
 pragma solidity ^0.4.11;
 
@@ -118,7 +117,7 @@ contract GitHubOracle is Controlled, DGitI {
         repositoryReg.changeController(_newContract);
         gitHubPoints.changeController(_newContract);
         newContract = _newContract;
-        if(_newContract != 0) _newContract.send(this.balance);
+        if(_newContract != 0) _newContract.transfer(this.balance);
     }
 
     function __pendingScan(uint256 _projectId, string _lastCommit, string _pendingTail) oraclized {

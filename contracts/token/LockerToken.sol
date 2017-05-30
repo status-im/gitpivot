@@ -6,8 +6,8 @@
  */
 
 import "./AbstractToken.sol";
-import "Lockable.sol";
-import "Controlled.sol";
+import "../management/Lockable.sol";
+import "../management/Controlled.sol";
 
 pragma solidity ^0.4.11;
 

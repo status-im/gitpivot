@@ -1,4 +1,4 @@
-import "Controlled.sol";
+import "../management/Controlled.sol";
 
 pragma solidity ^0.4.11;
 

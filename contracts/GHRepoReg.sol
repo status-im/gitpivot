@@ -5,9 +5,9 @@
  */
 
 import "./GitHubAPIReg.sol";
-import "./NameRegistry.sol";
+import "./management/NameRegistry.sol";
 import "./GitRepository.sol";
-import "strings.sol";
+import "./helpers/strings.sol";
 
 pragma solidity ^0.4.11;
 
@@ -69,7 +69,7 @@ contract GitHubRepositoryReg is NameRegistry, GitHubAPIReg {
         (default_branch,pos) = getNextString(v,pos);
         address repoAddr = repositories[projectId].addr;
         if(repoAddr == 0x0){   
-            GitRepositoryI repo = GitFactory.newGitRepository(projectId, full_name);
+            GitRepositoryI repo = new GitRepository(projectId, full_name);
             repo.changeController(controller);
             repoAddr = address(repo);
             indexes[sha3(repoAddr)] = projectId; 

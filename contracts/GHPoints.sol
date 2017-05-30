@@ -1,6 +1,6 @@
-import "oraclizeAPI_0.4.sol";
-import "Controlled.sol";
-import "strings.sol";
+import "./oraclize/oraclizeAPI_0.4.sol";
+import "./management/Controlled.sol";
+import "./helpers/strings.sol";
 
 pragma solidity ^0.4.11;
 

@@ -11,8 +11,8 @@
  */
 
 import "./Bank.sol";
-import "EpochLocker.sol";
-import "LockerToken.sol";
+import "../management/EpochLocker.sol";
+import "../token/LockerToken.sol";
 
 pragma solidity ^0.4.11;
 
@@ -36,8 +36,9 @@ contract CollaborationBank is Bank, EpochLocker {
     
     //update the balance and payout epoch
     modifier update_epoch {
-        if(currentPayEpoch < CURRENT_EPOCH) {
-            currentPayEpoch = CURRENT_EPOCH;
+        uint epoch = currentEpoch();
+        if(currentPayEpoch < epoch) {
+            currentPayEpoch = epoch;
             epochBalance = this.balance;
         }
         _;
@@ -63,8 +64,8 @@ contract CollaborationBank is Bank, EpochLocker {
     //withdraw if locked and not paid, updates epoch
     function withdrawal()
      external
-     check_lock(true)
      update_epoch
+     check_lock(true)
      not_paid {
         uint256 _tokenBalance = token.balanceOf(msg.sender);
         uint256 _tokenSupply = token.totalSupply();
@@ -84,10 +85,11 @@ contract CollaborationBank is Bank, EpochLocker {
      external
      constant 
      returns (uint256 payout) {
-        if (now < NEXT_LOCK) //unlocked, estimate
+        if (now < nextLock()){ //unlocked, estimate
             payout = (token.balanceOf(_tokenHolder) * this.balance) / token.totalSupply(); 
-        else
+        }else{
             payout = (token.balanceOf(_tokenHolder) * epochBalance) / token.totalSupply();
+        }
     }
 
 
