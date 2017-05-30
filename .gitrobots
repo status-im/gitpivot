@@ -1,2 +1,4 @@
 User-agent: *
-Reward-mode: Lines
+Reward-mode: Words
+Issues-reward: pulls, reactions, commits
+Pulls-reward: Reactions, commits
