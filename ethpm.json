@@ -1,0 +1,17 @@
+{
+  "package_name": "githuboracle",
+  "version": "0.0.1",
+  "description": "Tokenize commits and issues",
+  "authors": [
+    "Ricardo Guilherme Schmidt <3esmit>"
+  ],
+  "keywords": [
+    "ethereum",
+    "github",
+    "git"
+  ],
+  "dependencies": {
+    "oraclize": "^1.0.5"
+  },
+  "license": "GPL-3.0"
+}
