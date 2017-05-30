@@ -9,8 +9,6 @@ import re
  
 from collections import defaultdict
 
-
-
 startTime = datetime.now()
 def logmsg(msg):
     """Logs a message into proof."""
@@ -274,7 +272,7 @@ class GitRepository:
                     except urllib2.HTTPError:
                         logmsg("Found cross-referenced issue #"+refissue)
         return aissue
-        
+
     def pull_points(self, pullid):
         link_pull = self.repo_link + "/pulls/" + pullid
         pull = json.load(self.api.request(link_pull))
@@ -286,6 +284,24 @@ class GitRepository:
                 if commit['url']:
                     _commit = json.load(self.api.request(commit['url']))
                     self.compute_points(_commit)
+
+    def reaction_points(self, issueid):
+        headers = [["Accept", "application/vnd.github.squirrel-girl-preview"]]
+
+        logmsg("Loading issue reactions")
+        link_issues_reactions = self.repo_link + "/issues/" + pullid + "/reactions"
+        issues_reactions = json.load(self.api.request(link_issues_reactions, None, None, headers))
+        print issues_reactions
+
+        logmsg("Loadidng issue comments reactions")
+        link_issues_comments_reactions = self.repo_link + "/issues/comments/"+ issueid + "/reactions"
+        issues_comments_reactions = json.load(self.api.request(link_issues_comments_reactions, None, None, headers))
+        print issues_comments_reactions
+
+        logmsg("Loadidng pull comments reactions")
+        link_pulls_comments_reactions = self.repo_link + "/pulls/comments/"+ issueid + "/reactions"
+        pulls_comments_reactions = json.load(self.api.request(link_pulls_comments_reactions, None, None, headers))
+        print pulls_comments_reactions
 
     def compute_points(self, _commit):
         author = _commit['author']['id']
