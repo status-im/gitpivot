@@ -1,34 +1,70 @@
 # GitHubOracle
 
-Tokenize github repositories by commits and issues. Accept donations in eth tokens, distribute donations and bounties to code commiters.
+Ethereum application to incentive open-source development in GitHub by opening direct fair payment channels for bounties and indirect payments through tokenization of commits.
 
-## Usage
+This project was formely known as GitHubTokens, created to tokenize contributions of [TheEtherian news platform](https://etherian.world/).
 
-## User Registration
+The project become embraced by [Status Network](status.im) that will integrate it as backend of a trustless [Commiteth](https://github.com/status-im/commiteth).
 
-Create a gist in your github containing in it's body only an ethereum address you own.   
-Must be in first line with no spaces and no more lines.
-Call `DGit.register("<your_github_login>","<your gistid>")`  (oracle cost ~0.06 USD)  
-Example: `DGit.register("3esmit","31a58f2ddf2258697cce1b969e7c298b")`   
+## System Features
 
-## Repository
+### Configurable reward modes by project
 
-Call `DGit.addRepository("<owner>/<repository>")`  (oracle cost ~0.06 USD)
-Example:  `DGit.addRepository("status-im/github-oracle")`
+For a project being accepted by GitHubOracle it must have a file in root of tree called `.gitpoints` with specifing `user-agent:` to `*` or `githuboracle`.
 
-### Tokenize Contributions
+Example:
 
-Push your commits to GitHub and simply call `DGit.updateCommits("<owner>/<repository>")`    
-This call will cost $0.54 USD and can process up to 4000 commits.   
-Call `DGit.continueCommits("<owner>/<repository>")` (oracle cost ~0.54 USD)  
-Example: `DGit.updateCommits("status-im/github-oracle")`    
+```.gitpoints
+user-agent: *
+commits-reward: words
+issues-reward: pulls, comments, commits, reactions
+pulls-reward: comments, commits
+comments-reward: reactions
+reactions-reward: heart, +1 
 
-### Bounty issue
-When you start an issue at GitHub, you can bounty it. First you need to open it:   
-Call `DGit.openBounty("<owner>/<repository>",<issuenum>)` (oracle cost ~0.06 USD)       
-This will enable people to bounty into this issue, this call can contain itself a bounty to be added. 
-When issue is finalized call `DGit.updateIssue("<owner>/<repository>",<issuenum>)` (oracle cost ~0.54 USD)  
-This will tokenize the commits of pull requests cross-referenced with this issue and, after a lock period, distribute a fair share of bounty between contributors.    
- 
-### Withdraw donations   
-When contract enters in lock period just call `GitHubToken.withdraw()` to get your share of the donations.  
+```
+
+### GitHub User Ethereum Address
+
+To control GitHubOracle users need to link their GitHub user login to an ethereum address. 
+User calls GitHubOracle and passes his username and the gistid, GitHubOracle registers users by in gistid file called `register.txt` under user `login`.
+
+This file must contain only a ethereum address starting with `0x`.
+
+### Tokenize project merged contributions
+
+Any repository that enabled commits-rewards will have tokenization enabled of the contributions and a donation bank.
+
+The avaliable modes are `lines` or `words` that respectively mint tokens by added lines or added words.
+
+### Distribute project donations to contributors
+
+Repositories that enabled tokenizations of contributions also have a DonationBank that can be withdrawn by Project Token Holders in the start of every epoch, called locked period, where trasfers and minting are blocked.
+
+### Reward bounties by contribuion in GitHub Issues.
+
+Issues may be tracked by GitHubOracle, accept payments, depending on the `.gitpoints` configuration, positively reacted posts and merged pull requests/commits generate points that allow issue contributors to withdraw a fair share of balances related to the issue.
+
+## Network Features
+
+### Code wage contracts
+
+Different types of contracts can be programmed to accept buy of project tokens by a list of allowed users/accounts.
+
+### Code ICO
+
+The initial coin offers may be based on project tokens or use project tokens to mint the developers share.
+
+### Testnet Faucets
+
+The project may be deployed in PoA chains, such Rinkeby and Kovan, and automatically faucet as code wage contract in registered projects to all developers.
+
+### Other
+
+Ethereum network potential still much unexplored and we still don't know all incredible things we can do. The tokens are ERC20 and ERC23 compataible so your project token might even become exchangable in a descentralized trade market.
+
+## Credits
+
+Developed by Ricardo Guilherme Schmidt <3esmit>;
+
+Special thanks to all that made this possible: Status.im, Oraclize, Solidity & Remix team, ParityTech, Kovan, Rinkeby, TheEtherian, Giveth, Ether.camp, Foundation.
