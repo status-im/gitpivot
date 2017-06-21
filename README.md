@@ -27,15 +27,15 @@ reactions-reward: heart, +1
 ### GitHub User Ethereum Address
 
 To control GitHubOracle users need to link their GitHub user login to an ethereum address. 
-User calls GitHubOracle and passes his username and the gistid, GitHubOracle registers users by in gistid file called `register.txt` under user `login`.
-
-This file must contain only a ethereum address starting with `0x`.
+User calls GitHubOracle and passes his username and the gistid, GitHubOracle registers users by loading gistid file called `register.txt` under user `login`. This file must contain only the ethereum address who made the register call, starting with `0x`.
 
 ### Tokenize project merged contributions
 
 Any repository that enabled commits-rewards will have tokenization enabled of the contributions and a donation bank.
 
 The avaliable modes are `lines` or `words` that respectively mint tokens by added lines or added words.
+
+GitHub Oracle load commits in batches, and accept continue in case of huge commit trees (+4k commits).
 
 ### Distribute project donations to contributors
 
