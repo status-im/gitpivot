@@ -9,18 +9,17 @@ pragma solidity ^0.4.11;
 
 contract EpochLocker is Lockable {
 
-    uint256 public creationTime = now;
     uint256 public unlockedTime = 25 days; 
     uint256 public lockedTime = 5 days; 
     uint256 public constant EPOCH_LENGTH = 30 days;
     
     function currentEpoch() public constant returns(uint256){
-        return (now - creationTime) / EPOCH_LENGTH + 1;        
+        return now / EPOCH_LENGTH + 1;        
     }
 
     function nextLock() public constant returns (uint256){
         uint256 epoch = currentEpoch();
-        return (creationTime + epoch * unlockedTime) + (epoch - 1) * lockedTime;
+        return (epoch * unlockedTime) + (epoch - 1) * lockedTime;
     }
 
     function EpochLocker(uint256 _unlockedTime, uint256 _lockedTime){ 
