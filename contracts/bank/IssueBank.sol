@@ -35,7 +35,7 @@ contract IssueBank is Controlled, TokenBank {
      * @notice deposit ether in bank
      **/
     function () payable {
-        deposit();
+        depositEther(new bytes(0));
     }
     
     /**
@@ -137,7 +137,7 @@ contract IssueBank is Controlled, TokenBank {
         for (uint i = 0; i< len; i++){
             ERC20 token = ERC20(_tokens[i]);
             amount = token.balanceOf(this);
-            if(amount > 0) withdraw(token, repoOwner, amount);
+            if(amount > 0) _withdraw(token, repoOwner, amount, 0x0);
         }
     }
     /**
@@ -152,20 +152,18 @@ contract IssueBank is Controlled, TokenBank {
     /**
      * @dev overwriten to only allow refund in correct state.
      **/
-    function refund(uint depositNonce) returns (bool) {
+    function refund(address token) returns (bool) {
         if(state != State.REFUND) throw;
-        refundNonce++;
-        if(refundNonce == nonce) state = State.FINALIZED;
-        return super.refund(depositNonce);   
+        return super.refund(token);   
     }
     
    /**
      * @dev register the deposit to refundings
      **/
-    function _deposited(address _tokenAddr, address _sender, uint _amount)
-     internal returns (uint receipt) {
+    function _deposited(address _sender, uint _amount, address _tokenAddr, bytes _data)
+     internal {
         if(state != State.OPEN) throw;
-        return super._deposited(_tokenAddr, _sender, _amount);
+        super._deposited(_sender, _amount, _tokenAddr, _data);
     }
     
     function _reward(address[] _tokens) internal {
@@ -181,11 +179,11 @@ contract IssueBank is Controlled, TokenBank {
             address tokenAddr = _tokens[i];
             reward = tokenBalances[tokenAddr];
             if (reward > 0) reward = calculeReward(reward, _reward_points);
-            if (reward > 0) withdraw(tokenAddr, dest, reward);
+            if (reward > 0) _withdraw(tokenAddr, dest, reward, 0x0);
         }
         reward = this.balance;
         if (reward > 0) reward = (reward / points) * _reward_points;
-        if (reward > 0) withdraw(dest, reward);
+        if (reward > 0) _withdraw(0x0, dest, reward, 0x0);
         points -= _reward_points;
         if(points == 0) state = State.FINALIZED;
     }

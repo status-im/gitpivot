@@ -1,11 +1,11 @@
-import "./Token.sol";
+import "../token/ERC23.sol";
 
 pragma solidity ^0.4.11;
 
 /**
  * @title TokenBank 
  * @author Ricardo Guilherme Schmidt <3esmit>
- * Abstract contract for deposit and withdraw of ETH and ERC20/23 Tokens
+ * Abstract contract for deposit and withdraw of ETH and ERC20/23 Tokens, with MiniMe token support.
  **/
 contract TokenBank is ERC23Receiver, ApproveAndCallFallBack {
     
@@ -16,13 +16,7 @@ contract TokenBank is ERC23Receiver, ApproveAndCallFallBack {
     mapping (address => uint) public tokenBalances;
     address[] public tokens;
 
-    uint private nonce;
-    
-    struct Deposit {
-        address sender;
-        address token;
-        uint amount;
-    }
+    uint public nonce;
     
     /**
      * @notice deposit ether in bank
@@ -76,9 +70,7 @@ contract TokenBank is ERC23Receiver, ApproveAndCallFallBack {
      **/   
     function refund(address _token) returns (bool) {
         address _sender = msg.sender;
-        uint amount = deposits[_sender][_token];
-        delete deposits[_sender][_token];
-        withdraw(_token, _sender, amount);
+        _withdraw(_token, _sender, deposits[_sender][_token], _sender);
         return true;
     }
 
@@ -109,6 +101,7 @@ contract TokenBank is ERC23Receiver, ApproveAndCallFallBack {
     function _deposited(address _sender, uint _amount, address _tokenAddr, bytes _data)
      internal {
         Deposited(_tokenAddr, _sender, _amount);
+        nonce++;
         if(_tokenAddr != 0x0){
             if(tokenBalances[_tokenAddr] == 0){
                 tokens.push(_tokenAddr);  
@@ -124,9 +117,13 @@ contract TokenBank is ERC23Receiver, ApproveAndCallFallBack {
     /**
      * @dev withdraw token amount to dest
      **/
-    function withdraw(address _tokenAddr, address _dest, uint _amount)
+    function _withdraw(address _tokenAddr, address _dest, uint _amount, address _consumer)
      internal returns (bool){
         Withdrawn(_tokenAddr, _dest, _amount);
+        if(_consumer != 0x0) {
+            require(deposits[_consumer][_tokenAddr] >= _amount);
+            deposits[_consumer][_tokenAddr] -= _amount;
+        }
         if(_tokenAddr == 0x0){ 
             _dest.transfer(_amount);
             return true;
