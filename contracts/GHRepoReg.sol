@@ -1,16 +1,15 @@
-/** 
- * GitHubRepositoryReg.sol
- * Registers the master branch of a Repository for GitHubOracle tracking.
- * Ricardo Guilherme Schmidt <3esmit@gmail.com>
- */
+pragma solidity ^0.4.11;
 
 import "./GitHubAPIReg.sol";
 import "./management/NameRegistry.sol";
 import "./GitRepository.sol";
 import "./helpers/strings.sol";
 
-pragma solidity ^0.4.11;
-
+/** 
+ * @title GitHubRepositoryReg.sol
+ * Registers the master branch of a Repository for GitHubOracle tracking.
+ * @author Ricardo Guilherme Schmidt
+ */
 contract GitHubRepositoryReg is NameRegistry, GitHubAPIReg {
     using strings for string;
     using strings for strings.slice;

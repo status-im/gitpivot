@@ -1,6 +1,6 @@
-import "./ERC20.sol";
-
 pragma solidity ^0.4.11;
+
+import "./ERC20.sol";
 
 contract ERC23Receiver {
     function tokenFallback(address _from, uint _value, bytes _data);

@@ -1,95 +1,76 @@
-/**
- * Abstract contract used for recieving donations or profits
- * Withdraw is divided by total tokens each account owns
- * Unlock period allows transfers
- * Lock period allow withdraws
- * Child contract that implement minting should use modifier not_locked in minting function
- * Inspired by ProfitContainer and Lockable by vDice
- * 
- * By Ricardo Guilherme Schmidt
- * Released under GPLv3 License
- */
+pragma solidity ^0.4.10;
 
-import "./Bank.sol";
+import "../token/MiniMeToken.sol";
 import "../management/EpochLocker.sol";
-import "../token/LockerToken.sol";
 
-pragma solidity ^0.4.11;
-
-contract CollaborationBank is Bank, EpochLocker {
+contract CollaborationBank is  EpochLocker, Controlled {
     
-    LockerToken public token;
+    MiniMeToken public token;
     //used for calculating balance and for checking if account withdrawn
     uint256 public currentPayEpoch;
+    uint256 public pendingBalance = 0;
     //stores the balance from the lock time
-    uint256 public epochBalance;
+    mapping (uint => uint) public epochBalances;
     //used for checking if account withdrawn
     mapping (address => uint) lastPaidOutEpoch;
     //events
-    event Withdrawn(address tokenHolder, uint256 amountPaidOut);
-    event Deposited(address donator,uint256 value);
-
-    function CollaborationBank(LockerToken _token) EpochLocker(8 minutes, 12 minutes){
+    
+    function CollaborationBank(MiniMeToken _token,uint unlocked, uint locked) EpochLocker(unlocked, locked) {
         token = _token;
-        
     }
     
-    //update the balance and payout epoch
-    modifier update_epoch {
-        uint epoch = currentEpoch();
-        if(currentPayEpoch < epoch) {
-            currentPayEpoch = epoch;
-            epochBalance = this.balance;
-        }
-        _;
+    function reconfigure(MiniMeToken _token, uint unlocked, uint locked) onlyController {
+        token = _token;
+        unlockedLenght = unlocked;
+        lockedLenght = locked;
     }
 
-    //checks if user already withdrawn
-    modifier not_paid {
-        if (lastPaidOutEpoch[msg.sender] == currentPayEpoch) throw;
-        _;
-    }
-    
     //check overflow in multiply
     function safeMultiply(uint256 _a, uint256 _b) private {
         if (!(_b == 0 || ((_a * _b) / _b) == _a)) throw;
     }
     
-    //allow deposit and call event
-    function ()
-     payable {
-        deposit();
-    }
-
     //withdraw if locked and not paid, updates epoch
     function withdrawal()
-     external
-     update_epoch
-     check_lock(true)
-     not_paid {
-        uint256 _tokenBalance = token.balanceOf(msg.sender);
-        uint256 _tokenSupply = token.totalSupply();
-        safeMultiply(_tokenBalance, epochBalance);
-        lastPaidOutEpoch[msg.sender] = currentPayEpoch; 
-        if (this.balance >= epochBalance || _tokenBalance == 0 || _tokenSupply == 0) throw;
-        super.withdrawal(msg.sender, (_tokenBalance * epochBalance) / _tokenSupply);
+     external {
+        if(this.balance == 0) throw; 
+        if(!isLocked()) throw;
+        uint _currentEpoch = currentEpoch();
+
+        if(epochBalances[_currentEpoch] == 0){
+            uint _thisEpochBalance = this.balance - pendingBalance;
+            epochBalances[_currentEpoch] = _thisEpochBalance;
+            pendingBalance += _thisEpochBalance;
+        } 
+        
+        uint256 _lockBlock;
+        uint256 _tokenBalance;
+        uint256 _tokenSupply;
+        uint _lastPayout = lastPaidOutEpoch[msg.sender];
+        uint _amount = 0;
+        for(_lastPayout = _lastPayout+1; _lastPayout > _currentEpoch; _lastPayout++){
+            uint _epochBalance = epochBalances[_lastPayout];
+            if(_epochBalance > 0){
+                _lockBlock = epochLock(_lastPayout);
+                _tokenBalance = token.balanceOfAt(msg.sender, _lockBlock);
+                if(_tokenBalance > 0) {
+                    _tokenSupply = token.totalSupplyAt(_lockBlock);
+                    safeMultiply(_tokenBalance, _epochBalance);
+                    _amount += _tokenBalance * _epochBalance / _tokenSupply;
+                }
+                if(msg.gas < 10000) break;
+            }
+        }
+        lastPaidOutEpoch[msg.sender] = _lastPayout; 
+        if (_amount > 0){ 
+            pendingBalance -= _amount;
+            msg.sender.transfer(_amount);
+        }
     }
 
     //if this coin owns tokens of other CollaborationBank, allow withdraw
     function withdrawalFrom(CollaborationBank _otherCollaborationToken) {
         _otherCollaborationToken.withdrawal();
-    }
-
-    //return expected payout in lock or estimated when not locked
-    function expectedPayout(address _tokenHolder)
-     external
-     constant 
-     returns (uint256 payout) {
-        if (now < nextLock()){ //unlocked, estimate
-            payout = (token.balanceOf(_tokenHolder) * this.balance) / token.totalSupply(); 
-        }else{
-            payout = (token.balanceOf(_tokenHolder) * epochBalance) / token.totalSupply();
-        }
     }
 
 

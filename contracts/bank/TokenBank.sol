@@ -1,10 +1,11 @@
-import "../token/ERC23.sol";
-
 pragma solidity ^0.4.11;
+
+import "../token/ERC23.sol";
+import "../token/MiniMeToken.sol";
 
 /**
  * @title TokenBank 
- * @author Ricardo Guilherme Schmidt <3esmit>
+ * @author Ricardo Guilherme Schmidt 
  * Abstract contract for deposit and withdraw of ETH and ERC20/23 Tokens, with MiniMe token support.
  **/
 contract TokenBank is ERC23Receiver, ApproveAndCallFallBack {

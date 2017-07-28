@@ -1,14 +1,14 @@
-/** 
- * GitHubAPIReg.sol 
- * Abstract Logic for GitHubOracle Registries.
- * Ricardo Guilherme Schmidt <3esmit@gmail.com>
- */
+pragma solidity ^0.4.11;
+
 import "./management/Controlled.sol";
 import "./oraclize/oraclizeAPI_0.4.sol";
 import "./helpers/strings.sol";
 
-pragma solidity ^0.4.11;
-
+/** 
+ * @title GitHubAPIReg.sol 
+ * Abstract Logic for GitHubOracle Registries.
+ * @author Ricardo Guilherme Schmidt 
+ */
 contract GitHubAPIReg is Controlled, usingOraclize {
     using strings for string;
     using strings for strings.slice;

@@ -1,14 +1,13 @@
-/** 
- * GitHubUserReg.sol 
- * Registers GitHub user login to an address
- * Ricardo Guilherme Schmidt <3esmit@gmail.com>
- */
+pragma solidity ^0.4.11;
 import "./GitHubAPIReg.sol";
 import "./management/NameRegistry.sol";
 import "./helpers/strings.sol";
 
-pragma solidity ^0.4.11;
-
+/** 
+ * @title GitHubUserReg.sol 
+ * Registers GitHub user login to an address
+ * @author Ricardo Guilherme Schmidt 
+ */
 contract GitHubUserReg is NameRegistry, GitHubAPIReg {
     using strings for string;
     using strings for strings.slice;

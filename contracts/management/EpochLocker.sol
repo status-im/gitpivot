@@ -1,54 +1,33 @@
-/**
- * Abstract contract that locks and unlock in period of a time.
- * 
- */
-
-import "./Lockable.sol";
-
 pragma solidity ^0.4.11;
+/**
+ * @title EpochLocker
+ * @author Ricardo Guilherme Schmidt
+ * Abstract contract that locks and unlock in period of a blocks.
+ */
+contract EpochLocker {
 
-contract EpochLocker is Lockable {
-
-    uint256 public unlockedTime = 25 days; 
-    uint256 public lockedTime = 5 days; 
-    uint256 public constant EPOCH_LENGTH = 30 days;
+    uint256 public unlockedLenght; 
+    uint256 public lockedLenght;
     
-    function currentEpoch() public constant returns(uint256){
-        return now / EPOCH_LENGTH + 1;        
+    function EpochLocker(uint256 _unlockedLenght, uint256 _lockedLenght){ 
+        unlockedLenght = _unlockedLenght;
+        lockedLenght = _lockedLenght;
     }
 
-    function nextLock() public constant returns (uint256){
-        uint256 epoch = currentEpoch();
-        return (epoch * unlockedTime) + (epoch - 1) * lockedTime;
+    function currentEpoch() public constant returns (uint256) {
+        return (block.number / (unlockedLenght + lockedLenght)) + 1;        
     }
 
-    function EpochLocker(uint256 _unlockedTime, uint256 _lockedTime){ 
-        unlockedTime = _unlockedTime;
-        lockedTime = _lockedTime;
+    function nextLock() constant public returns (uint256) {
+        return epochLock(currentEpoch());
     }
 
-    //update lock value if needed or throw if unexpected lock
-    modifier check_lock(bool lockedOnly) {
-        if (nextLock() < now) { //is locked!
-            if(lockedOnly){ //method allowed when locked
-                if (!lock) setLock(true); //storage says other thing, update it.
-            }else{
-                if (lock) throw; //no need to update storage.
-                setLock(true); //update storage
-                return; //prevent method from running post states.    
-            }
-        }
-        else { //is not locked!
-            if(lockedOnly){ //method allowed when locked
-                if (!lock) throw; //unlocked and storage already say so, throw to prevent event flood.
-                setLock(false); //update storage
-                return; //prevent method from running post states.
-            }else{
-                if (lock) setLock(false); //storage says other thing, update it.
-            }
-        }
-        _;
+    function epochLock(uint256 epoch) constant public returns (uint256) {
+         return (epoch * unlockedLenght) + (epoch - 1) * lockedLenght;
+    }
+
+    function isLocked() constant public returns (bool locked) {
+        locked = nextLock() < block.number;
     }
     
-
 }

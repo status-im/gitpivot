@@ -1,8 +1,8 @@
+pragma solidity ^0.4.11;
+
 import "./oraclize/oraclizeAPI_0.4.sol";
 import "./management/Controlled.sol";
 import "./helpers/strings.sol";
-
-pragma solidity ^0.4.11;
 
 contract DGitI {
     function __setHead(uint256 projectId, string head);

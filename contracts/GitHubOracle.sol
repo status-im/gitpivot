@@ -1,25 +1,13 @@
-/**
- * GitHubOracle.sol
- * Contract that oracle github API
- * GitHubOracle register users and create GitHubToken contracts
- * Registration requires user create a gist with only their account address
- * GitHubOracle will create one GitHubToken contract per repository
- * GitHubToken mint tokens by commit only for registered users in GitHubOracle
- * GitHubToken is a LockableCoin, that accept donatations and can be withdrawn by Token Holders
- * The lookups are done by Oraclize that charge a small fee
- * The contract itself will never charge any fee
- * 
- * By Ricardo Guilherme Schmidt
- * Released under GPLv3 License
- */
- 
+pragma solidity ^0.4.11;
+
 import "./management/Controlled.sol";
 import "./GHUserReg.sol";
 import "./GHRepoReg.sol";
 import "./GHPoints.sol";
 
-pragma solidity ^0.4.11;
-
+/**
+ * @title GitHubOracle.sol
+ */
 contract GitHubOracle is Controlled, DGitI {
 
     GitHubUserReg public userReg;

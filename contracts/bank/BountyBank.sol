@@ -1,6 +1,6 @@
-import "../management/Controlled.sol";
-
 pragma solidity ^0.4.11;
+
+import "../management/Controlled.sol";
 
 contract BountyBank is Controlled {
     

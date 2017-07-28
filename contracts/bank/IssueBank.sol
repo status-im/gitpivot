@@ -1,11 +1,11 @@
+pragma solidity ^0.4.11;
+
 import "../bank/TokenBank.sol";
 import "../management/Controlled.sol";
 
-pragma solidity ^0.4.11;
-
 /**
  * @title IssueBank 
- * @author Ricardo Guilherme Schmidt <3esmit>
+ * @author Ricardo Guilherme Schmidt 
  * Enable deposits to be withdrawn by points recievers
  **/
 contract IssueBank is Controlled, TokenBank {
