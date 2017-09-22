@@ -1,10 +1,11 @@
-/** 
- * NameRegistry.sol
- * Interface for Name Registries.
- * Ricardo Guilherme Schmidt <3esmit@gmail.com>
- */
+
 pragma solidity ^0.4.11;
 
+/** 
+ * @author Ricardo Guilherme Schmidt (Status Research & Development GmbH)
+ * @title NameRegistry
+ * Interface for Name Registries.
+ */
 contract NameRegistry {
     function getAddr(uint256 _id) public constant returns(address addr);
     function getAddr(string _name) public constant returns(address addr);
@@ -13,11 +14,11 @@ contract NameRegistry {
     mapping (bytes32 => uint256) indexes; 
 
     function getId(address _addr) public constant returns(uint256 id){
-        return indexes[sha3(_addr)];
+        return indexes[keccak256(_addr)];
     } 
 
     function getId(string _name) public constant returns(uint256 id) {
-        return indexes[sha3(_name)];
+        return indexes[keccak256(_name)];
     }
     
     function _updateIndex(bytes32 _old, bytes32 _new) internal {

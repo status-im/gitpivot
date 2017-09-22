@@ -1,9 +1,12 @@
-pragma solidity ^0.4.11;
+pragma solidity ^0.4.10;
 
 contract Controlled {
     /// @notice The address of the controller is the only address that can call
     ///  a function with this modifier
-    modifier onlyController { if (msg.sender != controller) throw; _; }
+    modifier onlyController { 
+        require(msg.sender == controller); 
+        _; 
+    }
 
     address public controller;
 

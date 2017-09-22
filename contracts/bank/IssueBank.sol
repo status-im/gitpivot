@@ -1,14 +1,15 @@
 pragma solidity ^0.4.11;
 
-import "../bank/TokenBank.sol";
+import "../token/TokenLedger.sol";
 import "../management/Controlled.sol";
+
 
 /**
  * @title IssueBank 
- * @author Ricardo Guilherme Schmidt 
+ * @author Ricardo Guilherme Schmidt (Status Research & Development GmbH) 
  * Enable deposits to be withdrawn by points recievers
  **/
-contract IssueBank is Controlled, TokenBank {
+contract IssueBank is Controlled, TokenLedger {
     enum State {OPEN, REFUND, REWARD, FINALIZED }
     State public state;
     uint public points;
@@ -19,23 +20,23 @@ contract IssueBank is Controlled, TokenBank {
     struct Reward {
         bool active;
         uint points;
-     }
+    }
      
     modifier onlyRepoOwner{
-        if (msg.sender != repoOwner) throw;
+        require (msg.sender == repoOwner);
         _;
     }   
     
     function IssueBank(address _repoOwner) {
-       repoOwner = _repoOwner;
-       state = State.OPEN;
+        repoOwner = _repoOwner;
+        state = State.OPEN;
     }
     
     /**
      * @notice deposit ether in bank
      **/
     function () payable {
-        depositEther(new bytes(0));
+        deposits[msg.sender][0x0] += msg.value;
     }
     
     /**
@@ -52,14 +53,15 @@ contract IssueBank is Controlled, TokenBank {
     function rewardEthAnd(address[] _tokens) {
         _reward(_tokens);
     }
+
     /**
      * @notice only contoller may set reward to a single address. 
      * @param _claimer the beneficiary
      * @param _points amount of points
      **/
     function setReward(address _claimer, uint _points) onlyController { 
-        if(state != State.OPEN) throw;
-        if(rewards[_claimer].active) throw;
+        require(state == State.OPEN);
+        assert(!rewards[_claimer].active);
         rewards[_claimer].points = _points;
     }
     
@@ -69,11 +71,11 @@ contract IssueBank is Controlled, TokenBank {
      * @param _points the array of amount of points
      **/
     function setReward(address[] _claimers, uint[] _points) onlyController { 
-        if(state != State.OPEN) throw;
+        require(state == State.OPEN);
         uint len = _claimers.length;
-        for (uint i = 0; i < len; i++){
+        for (uint i = 0; i < len; i++) {
             address _claimer = _claimers[i];
-            if(rewards[_claimer].active) throw;
+            assert(!rewards[_claimer].active);
             rewards[_claimer].points = _points[i];
         }
     }
@@ -82,12 +84,12 @@ contract IssueBank is Controlled, TokenBank {
      * @notice only the repo owner may confirm reward of addresses
      * @param _claimers array of addresses that are eligible to reward
      **/
-    function confirm(address [] _claimers) onlyRepoOwner {
+    function confirm(address[] _claimers) onlyRepoOwner {
         uint len = _claimers.length;
         uint nPoints = 0;
-        for (uint i = 0; i < len; i++){
+        for (uint i = 0; i < len; i++) {
             address _claimer = _claimers[i];
-            if(rewards[_claimer].active) throw;
+            require(!rewards[_claimer].active);
             rewards[_claimer].active = true;
             nPoints += rewards[_claimer].points;
         }
@@ -99,7 +101,7 @@ contract IssueBank is Controlled, TokenBank {
      * @param _claimer the address that is eligible to reward
      **/
     function confirm(address _claimer) onlyRepoOwner {
-        if(rewards[_claimer].active) throw;
+        require(!rewards[_claimer].active);
         rewards[_claimer].active = true;
         points += rewards[_claimer].points;
     }
@@ -109,7 +111,7 @@ contract IssueBank is Controlled, TokenBank {
      * If no points confirmed the system will start refund, otherwise reward
      */
     function close() onlyRepoOwner {
-        if(state != State.OPEN) throw;
+        require(state == State.OPEN);
         state = points > 0 ? State.REWARD : State.REFUND;
     }
     
@@ -131,13 +133,20 @@ contract IssueBank is Controlled, TokenBank {
      * 
      **/
     function withdraw(address[] _tokens) onlyController {
-        if(state != State.FINALIZED) throw;
+        require(state == State.FINALIZED);
         uint len = _tokens.length;
         uint amount;
-        for (uint i = 0; i< len; i++){
+        for (uint i = 0; i < len; i++) {
             ERC20 token = ERC20(_tokens[i]);
             amount = token.balanceOf(this);
-            if(amount > 0) _withdraw(token, repoOwner, amount, 0x0);
+            if (amount > 0) {
+                withdraw(
+                    token,
+                    repoOwner,
+                    amount,
+                    0x0
+                );
+            }
         }
     }
     /**
@@ -145,62 +154,103 @@ contract IssueBank is Controlled, TokenBank {
      * This can only be done when all rewards are claimed. 
      **/    
     function kill() onlyController {
-        if(state != State.FINALIZED) throw;
+        require(state == State.FINALIZED);
         withdraw(tokens);
         selfdestruct(repoOwner);
     }
     /**
      * @dev overwriten to only allow refund in correct state.
      **/
-    function refund(address token) returns (bool) {
-        if(state != State.REFUND) throw;
-        return super.refund(token);   
+    function refund(address _token) returns (bool success) {
+        require(state == State.REFUND);
+        success = withdraw(
+            _token,
+            msg.sender,
+            deposits[_token][msg.sender],
+            msg.sender
+        );
     }
     
    /**
      * @dev register the deposit to refundings
      **/
-    function _deposited(address _sender, uint _amount, address _tokenAddr, bytes _data)
-     internal {
-        if(state != State.OPEN) throw;
-        super._deposited(_sender, _amount, _tokenAddr, _data);
+    function register(
+        address _token,
+        address _sender,
+        uint _amount,
+        bytes _data
+    )
+        internal 
+    {
+        require(state == State.OPEN);
+        super.register(
+            _token,
+            _sender,
+            _amount,
+            _data
+        );
     }
     
     function _reward(address[] _tokens) internal {
-        if(state != State.REWARD) throw;
+        require(state == State.REWARD);
         address dest = msg.sender;
-        if (!rewards[dest].active) throw;
-        uint _reward_points = rewards[dest].points;
+        require(rewards[dest].active);
+        uint _rewardPoints = rewards[dest].points;
         delete rewards[dest];
-        if (_reward_points == 0) throw;
-        uint reward;
+        require(_rewardPoints > 0);
+        uint _outReward;
         uint len = _tokens.length;
-        for (uint i = 0; i< len; i++){
+        for (uint i = 0; i < len; i++) {
             address tokenAddr = _tokens[i];
-            reward = tokenBalances[tokenAddr];
-            if (reward > 0) reward = calculeReward(reward, _reward_points);
-            if (reward > 0) _withdraw(tokenAddr, dest, reward, 0x0);
+            _outReward = tokenBalances[tokenAddr];
+            if (_outReward > 0) {
+                _outReward = calculeReward(_outReward, _rewardPoints);
+            }
+            if (_outReward > 0) {
+                withdraw(
+                    tokenAddr,
+                    dest,
+                    _outReward,
+                    0x0
+                );
+            }
         }
-        reward = this.balance;
-        if (reward > 0) reward = (reward / points) * _reward_points;
-        if (reward > 0) _withdraw(0x0, dest, reward, 0x0);
-        points -= _reward_points;
-        if(points == 0) state = State.FINALIZED;
+        _outReward = this.balance;
+        if (_outReward > 0) {
+            _outReward = (_outReward / points) * _rewardPoints;
+        }
+        if (_outReward > 0) {
+            withdraw(
+                0x0,
+                dest,
+                _outReward,
+                0x0
+            );
+        }
+        points -= _rewardPoints;
+        if (points == 0) {
+            state = State.FINALIZED;
+        }
     }
     
     /**
      * @dev amplifies small token balances to divide points 
      **/
-    function calculeReward(uint _balance, uint _reward_points) internal constant returns (uint reward) {
+    function calculeReward(uint _balance, uint _rewardPoints)
+        internal 
+        constant 
+        returns (uint _reward)
+    {
         uint amplifier = 1;
-        while(_balance * amplifier < points){ 
+        while (_balance * amplifier < points) {
             amplifier *= 10;
         }
-        reward = (((_balance*amplifier) / points) * _reward_points) / amplifier;
+        _reward = (((_balance*amplifier) / points) * _rewardPoints) / amplifier;
     }
     
     
 }
+
 
 /**
  * @title IssueBankFactory
@@ -211,7 +261,7 @@ contract IssueBankFactory {
     /**
      * @notice creates new IssueBank with repoOwner as moderator
      **/
-    function create(address repoOwner) returns(IssueBank){
+    function create(address repoOwner) returns(IssueBank) {
         IssueBank bank = new IssueBank(repoOwner);
         bank.changeController(msg.sender);
         return bank;

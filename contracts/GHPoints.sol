@@ -1,20 +1,62 @@
-pragma solidity ^0.4.11;
+
 
 import "./oraclize/oraclizeAPI_0.4.sol";
 import "./management/Controlled.sol";
 import "./helpers/strings.sol";
+pragma solidity ^0.4.10;
 
+/**
+ * @author Ricardo Guilherme Schmidt (Status Research & Development GmbH) 
+ */
 contract DGitI {
-    function __setHead(uint256 projectId, string head);
-    function __setTail(uint256 projectId, string tail);
-    function __pendingScan(uint256 projectId, string lastCommit, string pendingTail);
-    function __setIssue(uint256 projectId, uint256 issueId, bool state, uint256 closedAt);
-    function __newPoints(uint256 projectId, uint256[] userIds, uint[] totals);
-    function __setIssuePoints(uint256 projectId, uint256 issueId, uint256[] userIds, uint256[] points);
+
+    /**
+     * 
+     */
+    function setHead(uint256 projectId, string head) public;
+
+    /**
+     * 
+     */
+    function setTail(uint256 projectId, string tail) public;
+
+    /**
+     * 
+     */
+    function newPoints(uint256 projectId, uint256[] userIds, uint[] totals) public;
+
+    /**
+     * 
+     */
+    function pendingScan(uint256 projectId, string lastCommit, string pendingTail) public;
+
+    /**
+     * 
+     */
+    function setIssue(
+        uint256 projectId,
+        uint256 issueId,
+        bool state,
+        uint256 closedAt) public;
+
+    /**
+     * 
+     */
+    function setIssuePoints(
+        uint256 projectId, 
+        uint256 issueId,
+        uint256[] userIds, 
+        uint256[] points) public;
+
 }
 
-contract GitHubPoints is Controlled, usingOraclize{
+
+/**
+ * @author Ricardo Guilherme Schmidt (Status Research & Development GmbH) 
+ */
+contract GitHubPoints is Controlled, usingOraclize {
     
+    event OracleEvent(bytes32 myid, string result, bytes proof);
     using strings for string;
     using strings for strings.slice;
     
@@ -22,225 +64,450 @@ contract GitHubPoints is Controlled, usingOraclize{
     string private script = "";
     
     enum Command { ISSUE, START, UPDATE, RESUME, RTAIL }
-    mapping (bytes32 => Claim) claim; // temporary db 
-    struct Claim {
+    mapping (bytes32 => Request) request; // temporary db 
+
+    struct Request {
         Command command;
         string lastCommit;
         string branch;
     }
     
-    function start(string _repository, string _branch, string _cred) payable onlyController {
-        if(bytes(_cred).length == 0) _cred = cred; 
-        bytes32 ocid = oraclize_query("nested", _query_start(_repository,_branch,_cred));
-        claim[ocid] = Claim({command: Command.START, branch: _branch, lastCommit: ""});
-    }
-    
-    function update(string _repository, string _branch, string _lastCommit, string _cred) payable onlyController {
-        if(bytes(_cred).length == 0) _cred = cred; 
-        bytes32 ocid = oraclize_query("nested", _query_update(_repository,_branch,_lastCommit,_cred));
-        claim[ocid] = Claim({command: Command.UPDATE, branch: _branch, lastCommit: _lastCommit});
-    }
-    
-    function rtail(string _repository, string _branch, string _claimedTail, string _cred)
-     payable onlyController {
-        if(bytes(_cred).length == 0) _cred = cred; 
-        bytes32 ocid = oraclize_query("nested", _query_rtail(_repository,_branch,_claimedTail,_cred));
-        claim[ocid] = Claim({command: Command.RTAIL, branch: _branch, lastCommit: ""});
-    }
-    
-    function resume(string _repository, string _branch, string _pendingTail, string _claimedCommit, string _cred)
-     payable onlyController {
-        if(bytes(_cred).length == 0) _cred = cred; 
-        bytes32 ocid = oraclize_query("nested", _query_resume(_repository,_branch,_pendingTail,_claimedCommit,_cred));
-        claim[ocid] = Claim({command: Command.RESUME, branch: _branch, lastCommit: _claimedCommit});
-    }
-    
-    function issue(string _repository, string _issue, string _cred)
-     payable onlyController {
-        if(bytes(_cred).length == 0) _cred = cred; 
-        bytes32 ocid = oraclize_query("nested", _query_issue(_repository,_issue,_cred));
-        claim[ocid].command = Command.ISSUE;
-    }
-    
-    event OracleEvent(bytes32 myid, string result, bytes proof);
-    //oraclize response callback
-    function __callback(bytes32 myid, string result, bytes proof) {
-        OracleEvent(myid, result, proof);
-        if (msg.sender != oraclize.cbAddress()) throw; 
-        _process(bytes(result),claim[myid]);
-        delete claim[myid];
+
+    /**
+     * 
+     */
+    modifier credentials(string _cred) {
+        if (bytes(_cred).length == 0) {
+            _cred = cred;
+        }
+        _;
     }
 
-    function _process(bytes v, Claim claim) internal {
+    /**
+     * 
+     */
+    function start(string _repository, string _branch, string _cred)
+        public 
+        payable
+        credentials(_cred) 
+        onlyController 
+        returns(bytes32 ocid) 
+    {
+        ocid = oraclize_query("nested", queryStart(_repository,_branch,_cred));
+        request[ocid] = Request({
+            command: Command.START,
+            branch: _branch,
+            lastCommit: ""
+        });
+    }
+
+    /**
+     * 
+     */
+    function update(
+        string _repository, 
+        string _branch, 
+        string _lastCommit, 
+        string _cred
+    )
+        public 
+        payable
+        credentials(_cred) 
+        onlyController 
+        returns(bytes32 ocid) 
+    {
+        ocid = oraclize_query(
+            "nested",
+            queryUpdate(
+                _repository,
+                _branch,
+                _lastCommit,
+                _cred
+            )
+        );
+        request[ocid] = Request({
+            command: Command.UPDATE,
+            branch: _branch,
+            lastCommit: _lastCommit
+        });
+    }
+
+    /**
+     * 
+     */
+    function rtail(
+        string _repository, 
+        string _branch, 
+        string _requestedTail, 
+        string _cred
+    )
+        public 
+        payable
+        credentials(_cred) 
+        onlyController 
+        returns(bytes32 ocid) 
+    {
+        ocid = oraclize_query(
+            "nested", 
+            queryRtail(
+                _repository, 
+                _branch, 
+                _requestedTail, 
+                _cred
+            )
+        );
+        request[ocid] = Request({
+            command: Command.RTAIL,
+            branch: _branch,
+            lastCommit: ""
+        });
+    }
+
+    /**
+     * 
+     */
+    function resume(
+        string _repository,
+        string _branch,
+        string _pendingTail,
+        string _requestedCommit,
+        string _cred
+    )
+        public
+        payable
+        credentials(_cred) 
+        onlyController 
+        returns(bytes32 ocid) 
+    {
+        ocid = oraclize_query(
+            "nested", 
+            queryResume(
+                _repository,
+                _branch,
+                _pendingTail,
+                _requestedCommit,
+                _cred
+            )
+        );
+        request[ocid] = Request({
+            command: Command.RESUME,
+            branch: _branch,
+            lastCommit: _requestedCommit
+        });
+    }
+
+    /**
+     * 
+     */
+    function issue(string _repository, string _issue, string _cred)
+        public
+        payable
+        credentials(_cred)
+        onlyController
+        returns(bytes32 ocid)
+    {
+        ocid = oraclize_query(
+            "nested", 
+            queryIssue(
+                _repository,
+                _issue,
+                _cred
+            )
+        );
+        request[ocid].command = Command.ISSUE;
+    }
+
+    /**
+     * 
+     */
+    function __callback(bytes32 myid, string result, bytes proof) public {
+        OracleEvent(myid, result, proof);
+        require (msg.sender == oraclize.cbAddress()); 
+        processRequest(bytes(result), request[myid]);
+        delete request[myid];
+    }
+
+    /**
+     * 
+     */
+    function processRequest(bytes v, Request _request) 
+        internal
+    {
         DGitI dGit = DGitI(controller);
         uint8 pos = 0;
         string memory temp;
         uint256 projectId; 
         uint256 issueId; 
-        (projectId,pos) = getNextUInt(v,pos);
+        (projectId, pos) = getNextUInt(v, pos);
         
-        if(claim.command == Command.ISSUE){
-            (issueId,pos) = getNextUInt(v,pos);
-            (temp,pos) = getNextString(v,pos);//temp = issue state
+        if (_request.command == Command.ISSUE) {
+            (issueId, pos) = getNextUInt(v, pos);
+            (temp, pos) = getNextString(v, pos);//temp = issue state
             uint256 closedAt; 
-            (closedAt,pos) = getNextUInt(v,pos);
-            dGit.__setIssue(projectId,issueId,(sha3("open") == sha3(temp)),closedAt);
+            (closedAt, pos) = getNextUInt(v, pos);
+            bool open = keccak256("open") == keccak256(temp);
+            dGit.setIssue(
+                projectId,
+                issueId,
+                open,
+                closedAt
+            );
         } else {
-            (temp,pos) = getNextString(v,pos); //temp = branch
-            if(sha3(claim.branch) != sha3(temp)) return;    
+            (temp,pos) = getNextString(v, pos); //temp = branch
+            if (keccak256(_request.branch) != keccak256(temp)) 
+                return;
             
-            if(claim.command == Command.START || claim.command == Command.UPDATE){
-                (temp,pos) = getNextString(v,pos); //temp = scan head
-                dGit.__setHead(projectId,temp); 
+            if (_request.command == Command.START || _request.command == Command.UPDATE) {
+                (temp, pos) = getNextString(v, pos); //temp = scan head
+                dGit.setHead(projectId, temp); 
             }
             (temp,pos) = getNextString(v,pos); //temp = scan tail
-            if(claim.command == Command.START || claim.command == Command.RTAIL){
-                dGit.__setTail(projectId,temp);   
+            if (_request.command == Command.START || _request.command == Command.RTAIL) {
+                dGit.setTail(projectId, temp);   
             }
-            if((claim.command == Command.RESUME || claim.command == Command.UPDATE) && sha3(claim.lastCommit) != sha3(temp)){
+            if ((_request.command == Command.RESUME || _request.command == Command.UPDATE) && keccak256(_request.lastCommit) != keccak256(temp)) {
              //update didn't reached _lastCommit
-                dGit.__pendingScan(projectId,temp,claim.lastCommit);
+                dGit.pendingScan(projectId, temp, _request.lastCommit);
             }
         }
         uint numAuthors;
         (numAuthors,pos) = getNextUInt(v,pos);
         uint[] memory userId = new uint[](numAuthors);
         uint[] memory points = new uint[](numAuthors);
-        for(uint i; i < numAuthors; i++){
+        for (uint i; i < numAuthors; i++) {
             (userId[i],pos) = getNextUInt(v,pos);
             (points[i],pos) = getNextUInt(v,pos);
         }
-        if(claim.command == Command.ISSUE){
-            dGit.__setIssuePoints(projectId,issueId,userId,points);
-        }else{
-            dGit.__newPoints(projectId,userId,points); 
+        if (_request.command == Command.ISSUE) {
+            dGit.setIssuePoints(
+                projectId,
+                issueId,
+                userId,
+                points
+            );
+        } else {
+            dGit.newPoints(projectId,userId,points);
         }
     }
-    
-    //owner management
-    function GitHubPoints(string _script){
-        script = _script;
-    }
-    
-    function setAPICredentials(string _client_id_comma_client_secret) onlyController {
-         cred = _client_id_comma_client_secret;
-    }
-    
-    function setScript(string _script) onlyController{
+
+    /**
+     * 
+     */
+    function GitHubPoints(string _script) {
         script = _script;
     }
 
-    function clearAPICredentials() onlyController {
-         cred = "";
-     }
 
-    function _query_script(string command, string args, string cred) internal returns (string)  {
-       strings.slice memory comma = strings.toSlice("', '"); 
-       strings.slice [] memory cm = new strings.slice[](4);
-       cm[0] = script.toSlice();
-       cm[1] = command.toSlice();
-       cm[2] = args.toSlice();
-       cm[3] = cred.toSlice();
-       string memory array = comma.join(cm);
-       cm = new strings.slice[](3);
-       cm[0] = strings.toSlice("[computation] ['");
-       cm[1] = array.toSlice();
-       cm[2] = strings.toSlice("']");
-       return strings.toSlice("").join(cm);        
-    }
-    
-    function _query_start(string _repository, string _branch, string _cred)  internal returns (string)  {
-       strings.slice memory comma = strings.toSlice(",");
-       strings.slice [] memory cm = new strings.slice[](2);
-       cm[0] = _repository.toSlice();
-       cm[1] = _branch.toSlice();
-       return _query_script("start",comma.join(cm),_cred);
-    }
-    
-    function _query_update(string _repository, string _branch, string _lastCommit, string _cred)  internal returns (string)  {
-       strings.slice memory comma = strings.toSlice(",");
-       strings.slice [] memory cm = new strings.slice[](3);
-       cm[0] = _repository.toSlice();
-       cm[1] = _branch.toSlice();
-       cm[2] = _lastCommit.toSlice();
-       return _query_script("update",comma.join(cm),_cred);
-    }
-    
-    function _query_resume(string _repository, string _branch, string _tail, string _claimedCommit, string _cred) internal constant returns (string){
-       strings.slice memory comma = strings.toSlice(",");
-       strings.slice [] memory cm = new strings.slice[](4);
-       cm[0] = _repository.toSlice();
-       cm[1] = _branch.toSlice();
-       cm[2] = _tail.toSlice();
-       cm[3] = _claimedCommit.toSlice();
-       return _query_script("resume",comma.join(cm),_cred);
-    }
-    
-    function _query_rtail(string _repository, string _branch, string _claimedTail, string _cred) internal constant returns (string){
-       strings.slice memory comma = strings.toSlice(",");
-       strings.slice [] memory cm = new strings.slice[](3);
-       cm[0] = _repository.toSlice();
-       cm[1] = _branch.toSlice();
-       cm[2] = _claimedTail.toSlice();
-       return _query_script("rtail",comma.join(cm),_cred);
+    /**
+     * 
+     */  
+    function setAPICredentials(string _clientIdCommaClinetSecret) public onlyController {
+        cred = _clientIdCommaClinetSecret;
     }
 
-    function _query_issue(string _repository, string _issue, string _cred) internal returns(string){
-       strings.slice memory comma = strings.toSlice(",");
-       strings.slice [] memory cm = new strings.slice[](2);
-       cm[0] = _repository.toSlice();
-       cm[1] = _issue.toSlice();
-       return _query_script("issue",comma.join(cm),_cred);
+    /**
+     * 
+     */
+    function setScript(string _script) public onlyController {
+        script = _script;
     }
-    
 
-    function toBytes20(string memory source) internal constant returns (bytes20 result) {
+    /**
+     * 
+     */
+    function clearAPICredentials() public onlyController {
+        cred = "";
+    }
+
+    /**
+     * 
+     */
+    function queryScript(string _command, string _args, string _cred) 
+        internal 
+        returns (string) 
+    {
+        strings.slice memory comma = strings.toSlice("', '"); 
+        strings.slice[] memory cm = new strings.slice[](4);
+        cm[0] = script.toSlice();
+        cm[1] = _command.toSlice();
+        cm[2] = _args.toSlice();
+        cm[3] = _cred.toSlice();
+        string memory array = comma.join(cm);
+        cm = new strings.slice[](3);
+        cm[0] = strings.toSlice("[computation] ['");
+        cm[1] = array.toSlice();
+        cm[2] = strings.toSlice("']");
+        return strings.toSlice("").join(cm);
+    }
+
+    /**
+     * 
+     */
+    function queryStart(string _repository, string _branch, string _cred)
+        internal
+        returns (string)
+    {
+        strings.slice memory comma = strings.toSlice(",");
+        strings.slice[] memory cm = new strings.slice[](2);
+        cm[0] = _repository.toSlice();
+        cm[1] = _branch.toSlice();
+        return queryScript("start",comma.join(cm),_cred);
+    }
+
+    /**
+     * 
+     */
+    function queryUpdate(
+        string _repository,
+        string _branch,
+        string _lastCommit,
+        string _cred
+    )
+        internal
+        returns (string)
+    {
+        strings.slice memory comma = strings.toSlice(",");
+        strings.slice[] memory cm = new strings.slice[](3);
+        cm[0] = _repository.toSlice();
+        cm[1] = _branch.toSlice();
+        cm[2] = _lastCommit.toSlice();
+        return queryScript("update",comma.join(cm),_cred);
+    }
+
+    /**
+     * 
+     */
+    function queryResume(
+        string _repository,
+        string _branch,
+        string _tail,
+        string _requestedCommit,
+        string _cred
+    ) 
+        internal
+        returns (string)
+    {
+        strings.slice memory comma = strings.toSlice(",");
+        strings.slice[] memory cm = new strings.slice[](4);
+        cm[0] = _repository.toSlice();
+        cm[1] = _branch.toSlice();
+        cm[2] = _tail.toSlice();
+        cm[3] = _requestedCommit.toSlice();
+        return queryScript("resume",comma.join(cm),_cred);
+    }
+
+    /**
+     * 
+     */
+    function queryRtail(
+        string _repository,
+        string _branch,
+        string _requestedTail,
+        string _cred
+    )
+        internal
+        returns (string)
+    {
+        strings.slice memory comma = strings.toSlice(",");
+        strings.slice[] memory cm = new strings.slice[](3);
+        cm[0] = _repository.toSlice();
+        cm[1] = _branch.toSlice();
+        cm[2] = _requestedTail.toSlice();
+        return queryScript("rtail",comma.join(cm),_cred);
+    }
+
+    /**
+     * 
+     */
+    function queryIssue(string _repository, string _issue, string _cred)
+        internal
+        returns(string)
+    {
+        strings.slice memory comma = strings.toSlice(",");
+        strings.slice[] memory cm = new strings.slice[](2);
+        cm[0] = _repository.toSlice();
+        cm[1] = _issue.toSlice();
+        return queryScript("issue",comma.join(cm),_cred);
+    }
+
+    /**
+     * 
+     */
+    function toBytes20(string memory source)
+        internal
+        constant
+        returns (bytes20 result)
+    {
         assembly {
             result := mload(add(source, 20))
         }
     }
 
-    function getNextString(bytes _str, uint8 _pos) internal constant returns (string, uint8) {
-        uint8 start = 0;
+    /**
+     * 
+     */
+    function getNextString(bytes _str, uint8 _pos)
+        internal
+        constant
+        returns (string, uint8) 
+    {
+        uint8 _start = 0;
         uint8 end = 0;
-        uint strl =_str.length;
+        uint strl = _str.length;
         for (;strl > _pos; _pos++) {
-            if (_str[_pos] == '"'){ //Found quotation mark
-                if(_str[_pos-1] != '\\'){ //is not escaped
-	                end = start == 0 ? 0: _pos;
-	                start = start == 0 ? (_pos+1) : start;
-	                if(end > 0) break; 
+            if (_str[_pos] == "\"") { //Found quotation mark
+                if (_str[_pos-1] != "\\") { //is not escaped
+                    end = _start == 0 ? 0 : _pos;
+                    _start = _start == 0 ? (_pos + 1) : _start;
+                    if (end > 0)
+                        break;
                 }
             }
         }
-    	bytes memory str = new bytes(end-start);
-        for(_pos=0; _pos<str.length; _pos++){
-            str[_pos] = _str[start+_pos];
+        bytes memory str = new bytes(end - _start);
+        for (_pos = 0; _pos < str.length; _pos++) {
+            str[_pos] = _str[_start + _pos];
         }
-        for(_pos=end+1; _pos<_str.length; _pos++) if (_str[_pos] == ','){ _pos++; break; } //end
+        for (_pos = end + 1; _pos < _str.length; _pos++) { 
+            if (_str[_pos] == ",") {
+                _pos++; 
+                break; 
+            } //end
+        }
+        return (string(str), _pos);
+    }
 
-        return (string(str),_pos);
-	}
-
-    function getNextUInt(bytes _str, uint8 _pos) internal constant returns (uint, uint8) {
-        uint val = 0;
-        uint strl =_str.length;
-        for (; strl > _pos; _pos++) {
+    /**
+     * 
+     */
+    function getNextUInt(bytes _str, uint8 _continue)
+        internal
+        constant
+        returns (uint val, uint8 _pos)
+    {
+        val = 0;
+        uint strl = _str.length;
+        for (_pos = _continue; strl > _pos; _pos++) {
             byte bp = _str[_pos];
-            if (bp == ','){ //Find ends
-                _pos++; break;
-            }else if ((bp >= 48)&&(bp <= 57)){ //only ASCII numbers
+            if (bp == ",") { //Find ends
+                _pos++; 
+                break;
+            } else if ((bp >= 48)&&(bp <= 57)) { //only ASCII numbers
                 val *= 10;
                 val += uint(bp) - 48;
             }
         }
-        return (val,_pos);
+        return (val, _pos);
     }
 }
 
+
 library GHPoints {
 
-    function create(string _script) returns (GitHubPoints){
+    /**
+     *
+     */
+    function create(string _script) public returns (GitHubPoints) {
         return new GitHubPoints(_script);
     }
 

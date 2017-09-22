@@ -1,12 +1,8 @@
-pragma solidity ^0.4.11;
+pragma solidity ^0.4.14;
 
 import "./ERC20.sol";
 
-contract ERC23Receiver {
-    function tokenFallback(address _from, uint _value, bytes _data);
-}
-
-contract ERC23 is ERC20 { 
+contract ERC223 is ERC20 { 
     uint256 public decimals;
     string public name;
     string public symbol;
