@@ -1,21 +1,20 @@
 pragma solidity ^0.4.11;
 
 import "./GitHubAPIReg.sol";
-import "./management/NameRegistry.sol";
-import "./helpers/strings.sol";
-
+import "./common/strings.sol";
+import "./management/RegistryIndex.sol";
 
 /** 
  * @title GitHubUserReg.sol 
  * Registers GitHub user login to an address
  * @author Ricardo Guilherme Schmidt (Status Research & Development GmbH)]
  */
-contract GitHubUserReg is NameRegistry, GitHubAPIReg {
+contract UserOracle is GitHubAPIReg, RegistryIndex {
     using strings for string;
     using strings for strings.slice;
     
     mapping (bytes32 => UserClaim) userClaim; //temporary db for oraclize user register queries
-    mapping (uint256 => User) users; 
+
 
     event RegisterUpdated(string name);
  
@@ -24,31 +23,16 @@ contract GitHubUserReg is NameRegistry, GitHubAPIReg {
         address sender;
         string login;
     }
+
     
-    struct User {
-        address addr; 
-        string login; 
-    }
-    
-    function register(string _github_user, string _gistid, string _cred) public payable {
+    function register(string _githubUser, string _gistId, string _cred) public payable {
         if (bytes(_cred).length == 0) {
             _cred = cred; 
         }
-        bytes32 ocid = oraclize_query("nested", _query_script(_github_user, _gistid,_cred));
-        userClaim[ocid] = UserClaim({sender: msg.sender, login: _github_user});
+        bytes32 ocid = oraclize_query("nested", _queryScript(_githubUser, _gistId, _cred));
+        userClaim[ocid] = UserClaim({sender: msg.sender, login: _githubUser});
     }
 
-    function getAddr(uint256 _id) public constant returns(address addr) {
-        return users[_id].addr;
-    }
-
-     function getName(address _addr) public constant returns(string name) {
-        return users[indexes[keccak256(_addr)]].login;
-    } 
-
-    function getAddr(string _name) public constant returns(address addr) {
-        return users[indexes[keccak256(_name)]].addr;
-    }
 
     //oraclize response callback
     function __callback(bytes32 myid, string result, bytes proof) public {
@@ -68,38 +52,22 @@ contract GitHubUserReg is NameRegistry, GitHubAPIReg {
         (userId, pos) = getNextUInt(v, pos);
         if (userClaim[myid].sender == addrLoaded && keccak256(userClaim[myid].login) == keccak256(login)) {
             RegisterUpdated(login);
-            if (users[userId].addr != 0x0) {
-                delete indexes[keccak256(users[userId].login)];
-                delete indexes[keccak256(users[userId].addr)];
-            }
-            indexes[keccak256(addrLoaded)] = userId;
-            indexes[keccak256(login)] = userId;
-            users[userId].addr = addrLoaded;
-            users[userId].login = login;
+            setRegistry(userId, addrLoaded, login);
         }
         delete userClaim[myid];
     }
 
-    function _query_script(string _github_user, string _gistid, string _cred) internal returns (string) {
+    function _queryScript(string _githubUser, string _gistId, string _cred) internal returns (string) {
         strings.slice[] memory cm = new strings.slice[](8);
         cm[0] = strings.toSlice("[identity] ${[URL] https://gist.githubusercontent.com/");
-        cm[1] = _github_user.toSlice();
+        cm[1] = _githubUser.toSlice();
         cm[2] = strings.toSlice("/");
-        cm[3] = _gistid.toSlice();
+        cm[3] = _gistId.toSlice();
         cm[4] = strings.toSlice("/raw/register.txt}, ${[URL] json(https://api.github.com/gists/");
-        cm[5] = _gistid.toSlice();
+        cm[5] = _gistId.toSlice();
         cm[6] = _cred.toSlice();
         cm[7] = strings.toSlice(").owner.[login,id]}");
         return strings.toSlice("").join(cm);
-    }
-
-}
-
-
-library GHUserReg {
-
-    function create() returns (GitHubUserReg) {
-        return new GitHubUserReg();
     }
 
 }

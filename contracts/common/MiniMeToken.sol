@@ -25,7 +25,7 @@ pragma solidity ^0.4.6;
 ///  affecting the original token
 /// @dev It is ERC20 compliant, but still needs to under go further testing.
 
-import "../management/Controlled.sol";
+import "./Controlled.sol";
 import "./TokenController.sol";
 import "./ApproveAndCallFallBack.sol";
 

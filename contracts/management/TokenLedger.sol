@@ -1,8 +1,8 @@
 pragma solidity ^0.4.14;
 
-import "./ERC223.sol";
-import "./MiniMeToken.sol";
-import "./ERC223Receiver.sol";
+import "../common/ERC223.sol";
+import "../common/MiniMeToken.sol";
+import "../common/ERC223Receiver.sol";
 /**
 * @title TokenLedger 
 * @author Ricardo Guilherme Schmidt (Status Research & Development GmbH) 

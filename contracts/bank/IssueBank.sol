@@ -1,7 +1,7 @@
 pragma solidity ^0.4.11;
 
-import "../token/TokenLedger.sol";
-import "../management/Controlled.sol";
+import "../management/TokenLedger.sol";
+import "../common/Controlled.sol";
 
 
 /**

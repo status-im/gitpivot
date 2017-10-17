@@ -1,14 +1,13 @@
-
-
-import "./oraclize/oraclizeAPI_0.4.sol";
-import "./management/Controlled.sol";
-import "./helpers/strings.sol";
 pragma solidity ^0.4.10;
+
+import "./common/oraclizeAPI_0.4.sol";
+import "./common/Controlled.sol";
+import "./common/strings.sol";
 
 /**
  * @author Ricardo Guilherme Schmidt (Status Research & Development GmbH) 
  */
-contract DGitI {
+contract GitPivotI {
 
     /**
      * 
@@ -54,7 +53,7 @@ contract DGitI {
 /**
  * @author Ricardo Guilherme Schmidt (Status Research & Development GmbH) 
  */
-contract GitHubPoints is Controlled, usingOraclize {
+contract PointsOracle is Controlled, usingOraclize {
     
     event OracleEvent(bytes32 myid, string result, bytes proof);
     using strings for string;
@@ -222,7 +221,7 @@ contract GitHubPoints is Controlled, usingOraclize {
      */
     function __callback(bytes32 myid, string result, bytes proof) public {
         OracleEvent(myid, result, proof);
-        require (msg.sender == oraclize.cbAddress()); 
+        require (msg.sender == oraclize.cbAddress());
         processRequest(bytes(result), request[myid]);
         delete request[myid];
     }
@@ -233,20 +232,19 @@ contract GitHubPoints is Controlled, usingOraclize {
     function processRequest(bytes v, Request _request) 
         internal
     {
-        DGitI dGit = DGitI(controller);
+        GitPivotI pivot = GitPivotI(controller);
         uint8 pos = 0;
         string memory temp;
-        uint256 projectId; 
-        uint256 issueId; 
+        uint256 projectId;
+        uint256 issueId;
         (projectId, pos) = getNextUInt(v, pos);
-        
         if (_request.command == Command.ISSUE) {
             (issueId, pos) = getNextUInt(v, pos);
             (temp, pos) = getNextString(v, pos);//temp = issue state
             uint256 closedAt; 
             (closedAt, pos) = getNextUInt(v, pos);
-            bool open = keccak256("open") == keccak256(temp);
-            dGit.setIssue(
+            bool open = (keccak256("open") == keccak256(temp));
+            pivot.setIssue(
                 projectId,
                 issueId,
                 open,
@@ -259,15 +257,15 @@ contract GitHubPoints is Controlled, usingOraclize {
             
             if (_request.command == Command.START || _request.command == Command.UPDATE) {
                 (temp, pos) = getNextString(v, pos); //temp = scan head
-                dGit.setHead(projectId, temp); 
+                pivot.setHead(projectId, temp); 
             }
             (temp,pos) = getNextString(v,pos); //temp = scan tail
             if (_request.command == Command.START || _request.command == Command.RTAIL) {
-                dGit.setTail(projectId, temp);   
+                pivot.setTail(projectId, temp);   
             }
             if ((_request.command == Command.RESUME || _request.command == Command.UPDATE) && keccak256(_request.lastCommit) != keccak256(temp)) {
              //update didn't reached _lastCommit
-                dGit.pendingScan(projectId, temp, _request.lastCommit);
+                pivot.pendingScan(projectId, temp, _request.lastCommit);
             }
         }
         uint numAuthors;
@@ -279,21 +277,21 @@ contract GitHubPoints is Controlled, usingOraclize {
             (points[i],pos) = getNextUInt(v,pos);
         }
         if (_request.command == Command.ISSUE) {
-            dGit.setIssuePoints(
+            pivot.setIssuePoints(
                 projectId,
                 issueId,
                 userId,
                 points
             );
         } else {
-            dGit.newPoints(projectId,userId,points);
+            pivot.newPoints(projectId,userId,points);
         }
     }
 
     /**
      * 
      */
-    function GitHubPoints(string _script) {
+    function PointsOracle(string _script) {
         script = _script;
     }
 
@@ -499,16 +497,4 @@ contract GitHubPoints is Controlled, usingOraclize {
         }
         return (val, _pos);
     }
-}
-
-
-library GHPoints {
-
-    /**
-     *
-     */
-    function create(string _script) public returns (GitHubPoints) {
-        return new GitHubPoints(_script);
-    }
-
 }

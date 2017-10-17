@@ -1,30 +1,24 @@
 pragma solidity ^0.4.11;
 
 import "./GitHubAPIReg.sol";
-import "./management/NameRegistry.sol";
+import "./management/RegistryIndex.sol";
 import "./GitRepository.sol";
-import "./helpers/strings.sol";
+import "./common/strings.sol";
 
 
 /** 
- * @title GitHubRepositoryReg.sol
+ * @title RepositoryOracle
  * Registers the master branch of a Repository for GitHubOracle tracking.
  * @author Ricardo Guilherme Schmidt (Status Research & Development GmbH)]
  */
-contract GitHubRepositoryReg is NameRegistry, GitHubAPIReg {
+contract RepositoryOracle is GitHubAPIReg, RegistryIndex {
     using strings for string;
     using strings for strings.slice;
     
-    mapping (uint256 => Repository) public repositories; 
+    mapping (uint256 => bytes32) public branch; 
 
     event NewRepository(address addr, uint256 projectId, string fullName, string defaultBranch);
     
-    struct Repository {
-        address addr; 
-        string name;
-        bytes32 branch; 
-    }
-
     function register(string _repository, string _cred) payable {
         if (bytes(_cred).length == 0) {
             _cred = cred; 
@@ -36,23 +30,7 @@ contract GitHubRepositoryReg is NameRegistry, GitHubAPIReg {
             gas
         );
     }
-
-    function getAddr(uint256 _id) public constant returns(address addr) {
-        return repositories[_id].addr;
-    }
-
-     function getName(address _addr) public constant returns(string name) {
-        return repositories[indexes[keccak256(_addr)]].name;
-    } 
-
-    function getAddr(string _name) public constant returns(address addr) {
-        return repositories[indexes[keccak256(_name)]].addr;
-    }
-    
-    function getBranch(uint256 _id) public constant returns(bytes32 branch) {
-        return repositories[_id].branch;
-    }
-
+  
     //oraclize response callback
     function __callback(bytes32 myid, string result, bytes proof) {
         OracleEvent(myid, result, proof);
@@ -71,21 +49,16 @@ contract GitHubRepositoryReg is NameRegistry, GitHubAPIReg {
         (full_name, pos) = getNextString(v, pos);
         string memory default_branch;
         (default_branch, pos) = getNextString(v, pos);
-        address repoAddr = repositories[projectId].addr;
+        address repoAddr = registry[projectId].addr;
         if (repoAddr == 0x0) {   
+            NewRepository(repoAddr, projectId, full_name, default_branch);
             GitRepositoryI repo = new GitRepository(projectId, full_name);
             repo.changeController(controller);
-            repoAddr = address(repo);
-            indexes[keccak256(repoAddr)] = projectId; 
-            indexes[keccak256(full_name)] = projectId;
-            NewRepository(repoAddr, projectId, full_name, default_branch);
-            repositories[projectId] = Repository({addr: repoAddr, name: full_name, branch: keccak256(default_branch)});
+            repoAddr = address(repo);            
+            branch[projectId] = keccak256(default_branch);
+            setRegistry(repoAddr, projectId, full_name);
         } else {
-            bytes32 _new = keccak256(full_name);
-            bytes32 _old = keccak256(repositories[projectId].name);
-            if(_new != _old){
-                _updateIndex(_old, _new);
-            }
+            updateIndex(repositories[projectId].name, full_name);
         }
     }
     //internal helper functions
@@ -97,13 +70,4 @@ contract GitHubRepositoryReg is NameRegistry, GitHubAPIReg {
        cm[4] = strings.toSlice(").$.id,full_name,default_branch");
        return strings.toSlice("").join(cm);        
     }
-}
-
-
-library GHRepoReg {
-
-    function create() returns (GitHubRepositoryReg) {
-        return new GitHubRepositoryReg();
-    }
-
 }

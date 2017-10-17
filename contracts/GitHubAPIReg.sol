@@ -1,8 +1,9 @@
 pragma solidity ^0.4.11;
 
-import "./management/Controlled.sol";
-import "./oraclize/oraclizeAPI_0.4.sol";
-import "./helpers/strings.sol";
+import "./common/Controlled.sol";
+import "./common/oraclizeAPI_0.4.sol";
+import "./common/strings.sol";
+
 
 /** 
  * @title GitHubAPIReg.sol 

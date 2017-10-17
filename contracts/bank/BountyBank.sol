@@ -1,6 +1,6 @@
 pragma solidity ^0.4.11;
 
-import "../management/Controlled.sol";
+import "../common/Controlled.sol";
 
 /**
  * @author Ricardo Guilherme Schmidt (Status Research & Development GmbH)

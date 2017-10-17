@@ -9,8 +9,5 @@ module.exports = function(deployer) {
   deployer.deploy(strings);
   deployer.link(strings, [GHUserReg, GHRepoReg, GHPoints]);
   deployer.deploy([[GHUserReg], [GHRepoReg], [GHPoints]]);
-  deployer.link(GHUserReg, GitHubOracle);
-  deployer.link(GHRepoReg, GitHubOracle);
-  deployer.link(GHPoints, GitHubOracle);
   deployer.deploy(GitHubOracle);
 };

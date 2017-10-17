@@ -1,6 +1,6 @@
 pragma solidity ^0.4.10;
 
-import "../token/MiniMeToken.sol";
+import "../common/MiniMeToken.sol";
 
 
 /**

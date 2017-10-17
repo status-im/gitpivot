@@ -2,7 +2,7 @@ pragma solidity ^0.4.11;
 
 import "./bank/CollaborationBank.sol";
 import "./bank/BountyBank.sol";
-import "./management/Controlled.sol";
+import "./common/Controlled.sol";
 
 
 contract GitRepositoryI is Controlled {
