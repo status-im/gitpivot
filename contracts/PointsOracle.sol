@@ -1,61 +1,17 @@
 pragma solidity ^0.4.10;
 
-import "./common/oraclizeAPI_0.4.sol";
 import "./common/Controlled.sol";
 import "./common/strings.sol";
+import "./oraclize/oraclizeAPI_0.4.sol";
+import "./JSONHelper.sol";
+import "./IGitPivot.sol";
+import "./deploy/KillableModel.sol";
 
 /**
  * @author Ricardo Guilherme Schmidt (Status Research & Development GmbH) 
  */
-contract GitPivotI {
+contract PointsOracle is KillableModel, Controlled, JSONHelper, usingOraclize {
 
-    /**
-     * 
-     */
-    function setHead(uint256 projectId, string head) public;
-
-    /**
-     * 
-     */
-    function setTail(uint256 projectId, string tail) public;
-
-    /**
-     * 
-     */
-    function newPoints(uint256 projectId, uint256[] userIds, uint[] totals) public;
-
-    /**
-     * 
-     */
-    function pendingScan(uint256 projectId, string lastCommit, string pendingTail) public;
-
-    /**
-     * 
-     */
-    function setIssue(
-        uint256 projectId,
-        uint256 issueId,
-        bool state,
-        uint256 closedAt) public;
-
-    /**
-     * 
-     */
-    function setIssuePoints(
-        uint256 projectId, 
-        uint256 issueId,
-        uint256[] userIds, 
-        uint256[] points) public;
-
-}
-
-
-/**
- * @author Ricardo Guilherme Schmidt (Status Research & Development GmbH) 
- */
-contract PointsOracle is Controlled, usingOraclize {
-    
-    event OracleEvent(bytes32 myid, string result, bytes proof);
     using strings for string;
     using strings for strings.slice;
     
@@ -220,7 +176,6 @@ contract PointsOracle is Controlled, usingOraclize {
      * 
      */
     function __callback(bytes32 myid, string result, bytes proof) public {
-        OracleEvent(myid, result, proof);
         require (msg.sender == oraclize.cbAddress());
         processRequest(bytes(result), request[myid]);
         delete request[myid];
@@ -232,8 +187,8 @@ contract PointsOracle is Controlled, usingOraclize {
     function processRequest(bytes v, Request _request) 
         internal
     {
-        GitPivotI pivot = GitPivotI(controller);
-        uint8 pos = 0;
+        IGitPivot pivot = IGitPivot(controller);
+        uint256 pos = 0;
         string memory temp;
         uint256 projectId;
         uint256 issueId;
@@ -441,60 +396,4 @@ contract PointsOracle is Controlled, usingOraclize {
         }
     }
 
-    /**
-     * 
-     */
-    function getNextString(bytes _str, uint8 _pos)
-        internal
-        constant
-        returns (string, uint8) 
-    {
-        uint8 _start = 0;
-        uint8 end = 0;
-        uint strl = _str.length;
-        for (;strl > _pos; _pos++) {
-            if (_str[_pos] == "\"") { //Found quotation mark
-                if (_str[_pos-1] != "\\") { //is not escaped
-                    end = _start == 0 ? 0 : _pos;
-                    _start = _start == 0 ? (_pos + 1) : _start;
-                    if (end > 0)
-                        break;
-                }
-            }
-        }
-        bytes memory str = new bytes(end - _start);
-        for (_pos = 0; _pos < str.length; _pos++) {
-            str[_pos] = _str[_start + _pos];
-        }
-        for (_pos = end + 1; _pos < _str.length; _pos++) { 
-            if (_str[_pos] == ",") {
-                _pos++; 
-                break; 
-            } //end
-        }
-        return (string(str), _pos);
-    }
-
-    /**
-     * 
-     */
-    function getNextUInt(bytes _str, uint8 _continue)
-        internal
-        constant
-        returns (uint val, uint8 _pos)
-    {
-        val = 0;
-        uint strl = _str.length;
-        for (_pos = _continue; strl > _pos; _pos++) {
-            byte bp = _str[_pos];
-            if (bp == ",") { //Find ends
-                _pos++; 
-                break;
-            } else if ((bp >= 48)&&(bp <= 57)) { //only ASCII numbers
-                val *= 10;
-                val += uint(bp) - 48;
-            }
-        }
-        return (val, _pos);
-    }
 }

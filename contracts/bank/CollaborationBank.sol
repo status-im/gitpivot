@@ -1,10 +1,13 @@
 pragma solidity ^0.4.10;
 
-import "../common/MiniMeToken.sol";
+import "../common/Controlled.sol";
+import "../token/MiniMeToken.sol";
 
 
 /**
+ * @title CollaborationBank
  * @author Ricardo Guilherme Schmidt (Status Research & Development GmbH)
+ * @dev Share profit between tokenholders.
  */
 contract CollaborationBank is Controlled {
     
@@ -21,7 +24,7 @@ contract CollaborationBank is Controlled {
     uint256 public epochLenght; 
     uint256 public firstEpoch; 
 
-    function CollaborationBank(MiniMeToken _token, uint _epochLenght) {
+    function CollaborationBank(MiniMeToken _token, uint _epochLenght) public {
         epochLenght = _epochLenght;
         firstEpoch = currentEpoch();
         token = _token;

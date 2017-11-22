@@ -1,5 +1,5 @@
 {
-  "name": "github-oracle",
+  "name": "gitpivot",
   "version": "0.0.1",
   "description": "Tokenize commits and issues",
   "main": "index.js",

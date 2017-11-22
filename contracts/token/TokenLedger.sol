@@ -1,15 +1,17 @@
-pragma solidity ^0.4.14;
+pragma solidity ^0.4.17;
 
-import "../common/ERC223.sol";
-import "../common/MiniMeToken.sol";
-import "../common/ERC223Receiver.sol";
+import "./ERC223.sol";
+import "./MiniMeToken.sol";
+import "./TokenReceiver.sol";
+
+
 /**
 * @title TokenLedger 
 * @author Ricardo Guilherme Schmidt (Status Research & Development GmbH) 
 * Abstract contract for tracking token deposits.
-* Token transfers that did not approved and called `receiveApproval` can be tracked by 
+* Token transfers that did not approved and called `receiveApproval` can be tracked by updateInternalBalance
 **/
-contract TokenLedger is ERC223Receiver, ApproveAndCallFallBack {
+contract TokenLedger is TokenReceiver, ApproveAndCallFallBack {
     
     event Withdrawn(address indexed token, address indexed reciever, uint value);
     event Deposited(address indexed token, address indexed sender, uint value, bytes data);
@@ -27,9 +29,10 @@ contract TokenLedger is ERC223Receiver, ApproveAndCallFallBack {
     **/   
     function updateInternalBalance(address _token) 
         public
+        returns (uint newBal)
     {
         uint oldBal = tokenBalances[_token];
-        uint newBal = ERC20(_token).balanceOf(this);
+        newBal = ERC20(_token).balanceOf(this);
         require(newBal != oldBal);
         if (newBal > oldBal) {
             register(_token, address(this), newBal - oldBal, new bytes(0));
@@ -43,7 +46,10 @@ contract TokenLedger is ERC223Receiver, ApproveAndCallFallBack {
     * @param _from address incoming token
     * @param _amount incoming amount
     **/    
-    function tokenFallback(address _from, uint _amount, bytes _data) {
+    function tokenFallback(address _from, uint _amount, bytes _data)
+        public
+        returns (bool)
+    {
         register(msg.sender, _from, _amount, _data);
     }
     
@@ -58,7 +64,9 @@ contract TokenLedger is ERC223Receiver, ApproveAndCallFallBack {
         address _from,
         uint256 _amount,
         address _token,
-        bytes _data)
+        bytes _data
+    )
+        public
     {
         uint _nonce = nonce;
         ERC20 token = ERC20(_token);

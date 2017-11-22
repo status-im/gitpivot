@@ -1,16 +1,12 @@
-# GitHubOracle
+# GitPivot 
 
 Ethereum application to incentive open-source development in GitHub by opening direct fair payment channels for bounties and indirect payments through tokenization of commits.
-
-This project was formely known as GitHubTokens, created to tokenize contributions of [TheEtherian news platform](https://etherian.world/).
-
-The project become embraced by [Status Network](status.im) that will integrate it as backend of a trustless [Commiteth](https://github.com/status-im/commiteth).
 
 ## System Features
 
 ### Configurable reward modes by project
 
-For a project being accepted by GitHubOracle it must have a file in root of tree called `.gitpoints` with specifing `user-agent:` to `*` or `githuboracle`.
+For a project being accepted by GitPivot it must have a file in root of tree called `.gitpoints` with specifing `user-agent:` to `*` or `GitPivot`.
 
 Example:
 
@@ -26,8 +22,8 @@ reactions-reward: heart, +1
 
 ### GitHub User Ethereum Address
 
-To control GitHubOracle users need to link their GitHub user login to an ethereum address. 
-User calls GitHubOracle and passes his username and the gistid, GitHubOracle registers users by loading gistid file called `register.txt` under user `login`. This file must contain only the ethereum address who made the register call, starting with `0x`.
+To control GitPivot users need to link their GitHub user login to an ethereum address. 
+User calls GitPivot and passes his username and the gistid, GitPivot registers users by loading gistid file called `register.txt` under user `login`. This file must contain only the ethereum address who made the register call, starting with `0x`.
 
 ### Tokenize project merged contributions
 
@@ -43,7 +39,7 @@ Repositories that enabled tokenizations of contributions also have a DonationBan
 
 ### Reward bounties by contribuion in GitHub Issues.
 
-Issues may be tracked by GitHubOracle, accept payments, depending on the `.gitpoints` configuration, positively reacted posts and merged pull requests/commits generate points that allow issue contributors to withdraw a fair share of balances related to the issue.
+Issues may be tracked by GitPivot, accept payments, depending on the `.gitpoints` configuration, positively reacted posts and merged pull requests/commits generate points that allow issue contributors to withdraw a fair share of balances related to the issue.
 
 ## Network Features
 

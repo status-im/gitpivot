@@ -25,7 +25,7 @@ pragma solidity ^0.4.6;
 ///  affecting the original token
 /// @dev It is ERC20 compliant, but still needs to under go further testing.
 
-import "./Controlled.sol";
+import "../common/Controlled.sol";
 import "./TokenController.sol";
 import "./ApproveAndCallFallBack.sol";
 
@@ -37,13 +37,13 @@ contract MiniMeToken is Controlled {
     string public name;                //The Token's name: e.g. DigixDAO Tokens
     uint8 public decimals;             //Number of decimals of the smallest unit
     string public symbol;              //An identifier: e.g. REP
-    string public version = 'MMT_0.1'; //An arbitrary versioning scheme
+    string public version = "MMT_0.1"; //An arbitrary versioning scheme
 
 
     /// @dev `Checkpoint` is the structure that attaches a block number to a
     ///  given value, the block number attached is the one that last changed the
     ///  value
-    struct  Checkpoint {
+    struct Checkpoint {
 
         // `fromBlock` is the block number that the value was generated from
         uint128 fromBlock;

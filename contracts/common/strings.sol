@@ -691,20 +691,50 @@ library strings {
             return "";
 
         uint _len = self._len * (parts.length - 1);
-        for(uint i = 0; i < parts.length; i++)
+        for (uint i = 0; i < parts.length; i++) {
             _len += parts[i]._len;
+        }
 
         var ret = new string(_len);
         uint retptr;
         assembly { retptr := add(ret, 32) }
 
-        for(i = 0; i < parts.length; i++) {
+        for (i = 0; i < parts.length; i++) {
             memcpy(retptr, parts[i]._ptr, parts[i]._len);
             retptr += parts[i]._len;
             if (i < parts.length - 1) {
                 memcpy(retptr, self._ptr, self._len);
                 retptr += self._len;
             }
+        }
+
+        return ret;
+    }
+
+    /*
+     * @dev Joins an array of slices, returning a
+     *      newly allocated string.
+     * @param parts A list of slices to join.
+     * @return A newly allocated string containing
+     *         all the slices in `parts` joined.
+     */
+    function join(slice[] parts) internal returns (string) {
+        uint partslen = parts.length;
+        if (partslen == 0)
+            return "";
+
+        uint _len;
+        for (uint i = 0; i < partslen; i++) {
+            _len += parts[i]._len;
+        }
+
+        var ret = new string(_len);
+        uint retptr;
+        assembly { retptr := add(ret, 32) }
+
+        for (i = 0; i < partslen; i++) {
+            memcpy(retptr, parts[i]._ptr, parts[i]._len);
+            retptr += parts[i]._len;
         }
 
         return ret;

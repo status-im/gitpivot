@@ -69,8 +69,12 @@ contract usingOraclize {
 
     OraclizeI oraclize;
     modifier oraclizeAPI {
-        if((address(OAR)==0)||(getCodeSize(address(OAR))==0)) oraclize_setNetwork(networkID_auto);
-        oraclize = OraclizeI(OAR.getAddress());
+        if((address(OAR)==0)||(getCodeSize(address(OAR))==0))
+            oraclize_setNetwork(networkID_auto);
+
+        if(address(oraclize) != OAR.getAddress())
+            oraclize = OraclizeI(OAR.getAddress());
+
         _;
     }
     modifier coupon(string code){
@@ -79,7 +83,7 @@ contract usingOraclize {
         _;
     }
 
-    function oraclize_setNetwork(uint8 /*networkID*/) internal returns(bool){
+    function oraclize_setNetwork(uint8 networkID) internal returns(bool){
         if (getCodeSize(0x1d3B2638a7cC9f2CB3D298A3DA7a90B67E5506ed)>0){ //mainnet
             OAR = OraclizeAddrResolverI(0x1d3B2638a7cC9f2CB3D298A3DA7a90B67E5506ed);
             oraclize_setNetworkName("eth_mainnet");
@@ -773,7 +777,7 @@ contract usingOraclize {
         }
         bytes[3] memory args = [unonce, nbytes, sessionKeyHash]; 
         bytes32 queryId = oraclize_query(_delay, "random", args, _customGasLimit);
-        oraclize_randomDS_setCommitment(queryId, keccak256(bytes8(_delay), args[1], sha256(args[0]), args[2]));
+        oraclize_randomDS_setCommitment(queryId, sha3(bytes8(_delay), args[1], sha256(args[0]), args[2]));
         return queryId;
     }
     
@@ -805,10 +809,10 @@ contract usingOraclize {
         
         
         (sigok, signer) = safer_ecrecover(tosignh, 27, sigr, sigs);
-        if (address(keccak256(pubkey)) == signer) return true;
+        if (address(sha3(pubkey)) == signer) return true;
         else {
             (sigok, signer) = safer_ecrecover(tosignh, 28, sigr, sigs);
-            return (address(keccak256(pubkey)) == signer);
+            return (address(sha3(pubkey)) == signer);
         }
     }
 
@@ -857,6 +861,16 @@ contract usingOraclize {
         _;
     }
     
+    function oraclize_randomDS_proofVerify__returnCode(bytes32 _queryId, string _result, bytes _proof) internal returns (uint8){
+        // Step 1: the prefix has to match 'LP\x01' (Ledger Proof version 1)
+        if ((_proof[0] != "L")||(_proof[1] != "P")||(_proof[2] != 1)) return 1;
+        
+        bool proofVerified = oraclize_randomDS_proofVerify__main(_proof, _queryId, bytes(_result), oraclize_getNetworkName());
+        if (proofVerified == false) return 2;
+        
+        return 0;
+    }
+    
     function matchBytes32Prefix(bytes32 content, bytes prefix) internal returns (bool){
         bool match_ = true;
         
@@ -875,7 +889,7 @@ contract usingOraclize {
         uint ledgerProofLength = 3+65+(uint(proof[3+65+1])+2)+32;
         bytes memory keyhash = new bytes(32);
         copyBytes(proof, ledgerProofLength, 32, keyhash, 0);
-        checkok = (keccak256(keyhash) == keccak256(sha256(context_name, queryId)));
+        checkok = (sha3(keyhash) == sha3(sha256(context_name, queryId)));
         if (checkok == false) return false;
         
         bytes memory sig1 = new bytes(uint(proof[ledgerProofLength+(32+8+1+32)+1])+2);
@@ -887,7 +901,7 @@ contract usingOraclize {
         if (checkok == false) return false;
         
         
-        // Step 4: commitment match verification, keccak256(delay, nbytes, unonce, sessionKeyHash) == commitment in storage.
+        // Step 4: commitment match verification, sha3(delay, nbytes, unonce, sessionKeyHash) == commitment in storage.
         // This is to verify that the computed args match with the ones specified in the query.
         bytes memory commitmentSlice1 = new bytes(8+1+32);
         copyBytes(proof, ledgerProofLength+32, 8+1+32, commitmentSlice1, 0);
@@ -897,7 +911,7 @@ contract usingOraclize {
         copyBytes(proof, sig2offset-64, 64, sessionPubkey, 0);
         
         bytes32 sessionPubkeyHash = sha256(sessionPubkey);
-        if (oraclize_randomDS_args[queryId] == keccak256(commitmentSlice1, sessionPubkeyHash)){ //unonce, nbytes and sessionKeyHash match
+        if (oraclize_randomDS_args[queryId] == sha3(commitmentSlice1, sessionPubkeyHash)){ //unonce, nbytes and sessionKeyHash match
             delete oraclize_randomDS_args[queryId];
         } else return false;
         

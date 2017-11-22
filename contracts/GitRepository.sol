@@ -1,25 +1,16 @@
 pragma solidity ^0.4.11;
 
 import "./bank/CollaborationBank.sol";
-import "./bank/BountyBank.sol";
 import "./common/Controlled.sol";
-
-
-contract GitRepositoryI is Controlled {
-    function claim(address _user, uint _total) returns (bool);
-    function setBounty(uint256 _issueId, bool _state, uint256 _closedAt);
-    function setBountyPoints(uint256 _issueId,  address _claimer, uint256 _points);
-}
-
+import "./IGitRepository.sol";
 
 /**
  * @author Ricardo Guilherme Schmidt (Status Research & Development GmbH) 
  */
-contract GitRepository is TokenController, GitRepositoryI {
+contract GitRepository is IGitRepository, Controlled, TokenController {
 
     MiniMeToken public token;
     CollaborationBank public donationBank;
-    BountyBank public bountyBank;
     
     string public name;
     uint256 public uid;
@@ -27,7 +18,6 @@ contract GitRepository is TokenController, GitRepositoryI {
     function GitRepository(uint256 _uid, string _name) {
         uid = _uid;
         name = _name;
-        bountyBank = new BountyBank();
     }
 
     function setDonationBank(MiniMeToken _token, uint _epochLenght) public onlyController {
@@ -44,14 +34,15 @@ contract GitRepository is TokenController, GitRepositoryI {
     }
     
     function setBounty(uint256 _issueId, bool _state, uint256 _closedAt) public onlyController {
-        if (_state)
-            bountyBank.open(_issueId);
-        else 
-            bountyBank.close(_issueId, _closedAt);
+        if (_state) {
+            //TODO: open issue
+        } else {
+            //TODO: close issue
+        }
     }
     
     function setBountyPoints(uint256 _issueId, address _claimer, uint256 _points) public onlyController {
-        bountyBank.setClaimer(_issueId, _claimer, _points);
+        //TODO: set points
     }   
 
     function proxyPayment(address) public payable returns(bool) {

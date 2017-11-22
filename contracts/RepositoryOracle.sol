@@ -1,20 +1,22 @@
 pragma solidity ^0.4.11;
 
-import "./GitHubAPIReg.sol";
+import "./JSONHelper.sol";
 import "./management/RegistryIndex.sol";
 import "./GitRepository.sol";
 import "./common/strings.sol";
-
+import "./common/Controlled.sol";
+import "./deploy/KillableModel.sol";
+import "./oraclize/oraclizeAPI_0.4.sol";
 
 /** 
  * @title RepositoryOracle
  * Registers the master branch of a Repository for GitHubOracle tracking.
  * @author Ricardo Guilherme Schmidt (Status Research & Development GmbH)]
  */
-contract RepositoryOracle is GitHubAPIReg, RegistryIndex {
+contract RepositoryOracle is KillableModel, Controlled, RegistryIndex, JSONHelper, usingOraclize {
     using strings for string;
     using strings for strings.slice;
-    
+    string private cred = ""; 
     mapping (uint256 => bytes32) public branch; 
 
     event NewRepository(address addr, uint256 projectId, string fullName, string defaultBranch);
@@ -33,7 +35,7 @@ contract RepositoryOracle is GitHubAPIReg, RegistryIndex {
   
     //oraclize response callback
     function __callback(bytes32 myid, string result, bytes proof) {
-        OracleEvent(myid, result, proof);
+        //OracleEvent(myid, result, proof);
         require(msg.sender == oraclize.cbAddress());
         _setRepository(result);
     }
@@ -42,7 +44,7 @@ contract RepositoryOracle is GitHubAPIReg, RegistryIndex {
         internal //[85743750, "ethereans/TheEtherian", "master"]
     {
         bytes memory v = bytes(result);
-        uint8 pos = 0;
+        uint256 pos = 0;
         uint256 projectId; 
         (projectId, pos) = getNextUInt(v, pos);
         string memory full_name;
@@ -52,13 +54,14 @@ contract RepositoryOracle is GitHubAPIReg, RegistryIndex {
         address repoAddr = registry[projectId].addr;
         if (repoAddr == 0x0) {   
             NewRepository(repoAddr, projectId, full_name, default_branch);
-            GitRepositoryI repo = new GitRepository(projectId, full_name);
+            GitRepository repo = new GitRepository(projectId, full_name);
             repo.changeController(controller);
             repoAddr = address(repo);            
             branch[projectId] = keccak256(default_branch);
-            setRegistry(repoAddr, projectId, full_name);
+            setRegistry(projectId, repoAddr, full_name);
         } else {
-            updateIndex(repositories[projectId].name, full_name);
+            revert(); //TODO: update name
+            //updateIndex(registry[projectId], full_name);
         }
     }
     //internal helper functions

@@ -1,20 +1,24 @@
-pragma solidity ^0.4.11;
+pragma solidity ^0.4.17;
 
-import "./GitHubAPIReg.sol";
 import "./common/strings.sol";
+import "./deploy/KillableModel.sol";
+import "./JSONHelper.sol";
+import "./oraclize/oraclizeAPI_0.4.sol";
+import "./common/Controlled.sol";
 import "./management/RegistryIndex.sol";
+
 
 /** 
  * @title GitHubUserReg.sol 
  * Registers GitHub user login to an address
  * @author Ricardo Guilherme Schmidt (Status Research & Development GmbH)]
  */
-contract UserOracle is GitHubAPIReg, RegistryIndex {
+contract UserOracle is KillableModel, Controlled, RegistryIndex, JSONHelper, usingOraclize  {
     using strings for string;
     using strings for strings.slice;
-    
-    mapping (bytes32 => UserClaim) userClaim; //temporary db for oraclize user register queries
+    string private cred = ""; 
 
+    mapping (bytes32 => UserClaim) userClaim; //temporary db for oraclize user register queries
 
     event RegisterUpdated(string name);
  
@@ -24,8 +28,8 @@ contract UserOracle is GitHubAPIReg, RegistryIndex {
         string login;
     }
 
-    
     function register(string _githubUser, string _gistId, string _cred) public payable {
+        require(watchdog != 0x0);
         if (bytes(_cred).length == 0) {
             _cred = cred; 
         }
@@ -33,17 +37,16 @@ contract UserOracle is GitHubAPIReg, RegistryIndex {
         userClaim[ocid] = UserClaim({sender: msg.sender, login: _githubUser});
     }
 
-
     //oraclize response callback
     function __callback(bytes32 myid, string result, bytes proof) public {
-        OracleEvent(myid, result, proof);
+        //OracleEvent(myid, result, proof);
         require(msg.sender == oraclize.cbAddress());
         _register(myid, result);
     }
 
     function _register(bytes32 myid, string result) internal {
         bytes memory v = bytes(result);
-        uint8 pos = 0;
+        uint256 pos = 0;
         address addrLoaded; 
         string memory login; 
         uint256 userId; 

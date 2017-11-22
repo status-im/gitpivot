@@ -1,37 +1,51 @@
 pragma solidity ^0.4.11;
 
-import "../management/TokenLedger.sol";
+import "../token/TokenLedger.sol";
 import "../common/Controlled.sol";
-
 
 /**
  * @title IssueBank 
  * @author Ricardo Guilherme Schmidt (Status Research & Development GmbH) 
- * Enable deposits to be withdrawn by points recievers
+ * @dev Model (library) contract to set agreement between a repository owner and GitPivot
+ * about the bounty winners.
  **/
-contract IssueBank is Controlled, TokenLedger {
-    enum State {OPEN, REFUND, REWARD, FINALIZED }
-    State public state;
-    uint public points;
-    uint public refundNonce;
-    mapping (address => Reward) public rewards;
-    address public repoOwner;
-      
+contract IssueBankModel is Controlled, TokenLedger {
+
+    address public owner; //repository owner
+    mapping (address => Reward) public rewards;  //bounty winners candidates
+    uint public points; //remaining points to be claimed
+    State public state; //current issue state
+
+    enum State { OPEN, REFUND, REWARD, FINALIZED }
+    
     struct Reward {
-        bool active;
+        bool active; // repository owner can activate
         uint points;
     }
      
-    modifier onlyRepoOwner{
-        require (msg.sender == repoOwner);
+    modifier onlyOwner{
+        require (msg.sender == owner);
         _;
     }   
     
-    function IssueBank(address _repoOwner) {
-        repoOwner = _repoOwner;
+    /**
+     * @dev Model Constructor: Generates a locked state for model being unusable
+     **/
+    function IssueBankModel() public {
+        owner = 0x0;
+    }
+
+    /**
+     * @dev Instance Constructor: Actual agreement logic initialization.
+     * @param _owner Repository owner which will accept bounty winners and finalize issue.
+     **/
+    function IssueBank(address _owner) public {
+        require(controller == 0x0); 
+        controller = msg.sender;
+        owner = _owner;
         state = State.OPEN;
     }
-    
+
     /**
      * @notice deposit ether in bank
      **/
@@ -52,6 +66,16 @@ contract IssueBank is Controlled, TokenLedger {
      */
     function rewardEthAnd(address[] _tokens) {
         _reward(_tokens);
+    }
+
+
+    /**
+     * @notice Repository owner can replace his address 
+     * @param _newOwner 
+     **/
+    function updateOwner(address _newOwner) onlyOwner { 
+        require(_newOwner != 0x0);
+        owner = _newOwner;
     }
 
     /**
@@ -84,7 +108,7 @@ contract IssueBank is Controlled, TokenLedger {
      * @notice only the repo owner may confirm reward of addresses
      * @param _claimers array of addresses that are eligible to reward
      **/
-    function confirm(address[] _claimers) onlyRepoOwner {
+    function confirm(address[] _claimers) onlyOwner {
         uint len = _claimers.length;
         uint nPoints = 0;
         for (uint i = 0; i < len; i++) {
@@ -100,7 +124,7 @@ contract IssueBank is Controlled, TokenLedger {
      * @notice only the repo owner may confirm reward of single address
      * @param _claimer the address that is eligible to reward
      **/
-    function confirm(address _claimer) onlyRepoOwner {
+    function confirm(address _claimer) onlyOwner {
         require(!rewards[_claimer].active);
         rewards[_claimer].active = true;
         points += rewards[_claimer].points;
@@ -110,7 +134,7 @@ contract IssueBank is Controlled, TokenLedger {
      * @notice only repo owner can close deposits and start reward or refund
      * If no points confirmed the system will start refund, otherwise reward
      */
-    function close() onlyRepoOwner {
+    function close() onlyOwner {
         require(state == State.OPEN);
         state = points > 0 ? State.REWARD : State.REFUND;
     }
@@ -128,47 +152,51 @@ contract IssueBank is Controlled, TokenLedger {
     }
     
     /**
-     * @notice Withdraw tokens 
-     * only avaliable in REWARD state and all points claimed.
-     * 
+     * @notice withdraw remaining tokens and eth send them to repoOwner
+     *         this might be a case when some tokens were 'forgotten'
+     *         or simply sent after finalized. 
+     * @param _tokens the list of tokens to withdraw.
      **/
     function withdraw(address[] _tokens) onlyController {
         require(state == State.FINALIZED);
+        if (this.balance > 0) {
+            owner.send(this.balance);
+        }
         uint len = _tokens.length;
         uint amount;
         for (uint i = 0; i < len; i++) {
-            ERC20 token = ERC20(_tokens[i]);
-            amount = token.balanceOf(this);
+            address token = _tokens[i];
+            amount = updateInternalBalance(token);
             if (amount > 0) {
                 withdraw(
                     token,
-                    repoOwner,
+                    owner,
                     amount,
                     0x0
                 );
             }
         }
     }
+
     /**
-     * @notice only controller may kill contract and send all remaining eth and tokens to repo owner
-     * This can only be done when all rewards are claimed. 
-     **/    
-    function kill() onlyController {
-        require(state == State.FINALIZED);
-        withdraw(tokens);
-        selfdestruct(repoOwner);
-    }
-    /**
-     * @dev overwriten to only allow refund in correct state.
+     * @dev overwriten to only allow refund in correct state and to refund eth
      **/
     function refund(address _token) returns (bool success) {
         require(state == State.REFUND);
-        success = withdraw(
-            _token,
-            msg.sender,
-            deposits[_token][msg.sender],
-            msg.sender
-        );
+        if(_token == 0x0){
+            uint v = deposits[0x0][msg.sender];
+            if (v > 0) {
+                delete deposits[0x0][msg.sender];
+                success = msg.sender.send(v);
+            }
+        } else {
+            success = withdraw(
+                _token,
+                msg.sender,
+                deposits[_token][msg.sender],
+                msg.sender
+            );
+        }
     }
     
    /**
@@ -248,23 +276,5 @@ contract IssueBank is Controlled, TokenLedger {
         _reward = (((_balance*amplifier) / points) * _rewardPoints) / amplifier;
     }
     
-    
-}
-
-
-/**
- * @title IssueBankFactory
- * @author Ricado Guilherme Schmidt <3esmit>
- **/
-contract IssueBankFactory {
- 
-    /**
-     * @notice creates new IssueBank with repoOwner as moderator
-     **/
-    function create(address repoOwner) returns(IssueBank) {
-        IssueBank bank = new IssueBank(repoOwner);
-        bank.changeController(msg.sender);
-        return bank;
-    }   
     
 }

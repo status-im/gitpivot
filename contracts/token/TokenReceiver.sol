@@ -1,8 +1,8 @@
-pragma solidity ^0.4.14;
+pragma solidity ^0.4.17;
 
 /**
  * @title TokenReceiver
- * @dev Used by ERC677
+ * @dev ERC223 and ERC677
  */
 contract TokenReceiver {
     function tokenFallback(address _from, uint _value, bytes _data) public returns (bool);

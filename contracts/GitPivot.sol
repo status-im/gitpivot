@@ -4,13 +4,13 @@ import "./common/Controlled.sol";
 import "./PointsOracle.sol";
 import "./UserOracle.sol";
 import "./RepositoryOracle.sol";
-
+import "./IGitPivot.sol";
 
 /**
  * @title GitPivot.sol
  * @author Ricardo Guilherme Schmidt (Status Research & Development GmbH)
  */
-contract GitPivot is Controlled, DGitI {
+contract GitPivot is Controlled, IGitPivot {
 
     UserOracle public userOracle;
     RepositoryOracle public repositoryOracle;
@@ -40,7 +40,7 @@ contract GitPivot is Controlled, DGitI {
     function getRepository(string _repository, string _branch) public constant returns (uint repoId) {
         repoId = repositoryOracle.getId(_repository);
         require(repoId != 0);
-        require(repositoryOracle.getBranch(repoId) == keccak256(_branch));
+        require(repositoryOracle.branch(repoId) == keccak256(_branch));
     }
 
     function start(string _repository, string _branch, string _token) public payable {
@@ -96,7 +96,7 @@ contract GitPivot is Controlled, DGitI {
     
     //claims pending points
     function claimPending(uint _repoId, uint _userId) public {
-        GitRepositoryI repoaddr = GitRepositoryI(repositoryOracle.getAddr(_repoId));
+        GitRepository repoaddr = GitRepository(repositoryOracle.getAddr(_repoId));
         uint total = pending[_userId][_repoId];
         delete pending[_userId][_repoId];
         require(repoaddr.claim(userOracle.getAddr(_userId), total));
@@ -126,13 +126,6 @@ contract GitPivot is Controlled, DGitI {
         }
     }
 
-    function upgrade(uint[] _repoIds) public onlyUpgrading onlyController {
-        uint len = _repoIds.length;
-		for (uint i = 0; i < len; i++) {
-            Controlled(repositoryOracle.getAddr(_repoIds[i])).changeController(newContract);
-        }
-    }
-    
     function pendingScan(uint256 _projectId, string _lastCommit, string _pendingTail) public package {
         repositories[_projectId].pending[_pendingTail] = _lastCommit;
     }
@@ -154,7 +147,7 @@ contract GitPivot is Controlled, DGitI {
         public
         package
     {
-        GitRepositoryI repo = GitRepositoryI(repositoryOracle.getAddr(_projectId));
+        GitRepository repo = GitRepository(repositoryOracle.getAddr(_projectId));
         repo.setBounty(_issueId, _state, _closedAt);
     }
 
@@ -167,7 +160,7 @@ contract GitPivot is Controlled, DGitI {
         public 
         package 
     {
-        GitRepositoryI repo = GitRepositoryI(repositoryOracle.getAddr(_projectId));
+        GitRepository repo = GitRepository(repositoryOracle.getAddr(_projectId));
         uint len = _userId.length;
         for (uint i = 0; i < len; i++) {
             address addr = userOracle.getAddr(_userId[i]);
@@ -176,7 +169,7 @@ contract GitPivot is Controlled, DGitI {
     }
 
     function newPoints(uint _repoId, uint[] _userIds, uint[] _points) public package {
-        GitRepositoryI repo = GitRepositoryI(repositoryOracle.getAddr(_repoId));
+        GitRepository repo = GitRepository(repositoryOracle.getAddr(_repoId));
         uint len = _userIds.length;
         for (uint i = 0; i < len; i++) {
             uint _userId = _userIds[i];
