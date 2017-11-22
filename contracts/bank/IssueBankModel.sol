@@ -179,22 +179,26 @@ contract IssueBankModel is Controlled, TokenLedger {
     }
 
     /**
-     * @dev overwriten to only allow refund in correct state and to refund eth
+     * @notice withdraw ether and tokens sent by `msg.sender`
+     * @param _tokens the tokens to withdraw
      **/
-    function refund(address _token) returns (bool success) {
+    function refundEthAnd(address[] _tokens) {
         require(state == State.REFUND);
-        if(_token == 0x0){
-            uint v = deposits[0x0][msg.sender];
-            if (v > 0) {
-                delete deposits[0x0][msg.sender];
-                success = msg.sender.send(v);
-            }
-        } else {
-            success = withdraw(
-                _token,
-                msg.sender,
-                deposits[_token][msg.sender],
-                msg.sender
+        uint v = deposits[0x0][msg.sender];
+        if (v > 0) {
+            delete deposits[0x0][msg.sender];
+            require(msg.sender.send(v));
+        }
+        uint len = _tokens.length;
+        for (uint i = 0; i < len; i++) {
+            address _token = _tokens[i];
+            require(
+                withdraw(
+                    _token,
+                    msg.sender,
+                    deposits[_token][msg.sender],
+                    msg.sender
+                )
             );
         }
     }
